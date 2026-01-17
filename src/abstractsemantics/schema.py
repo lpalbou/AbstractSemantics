@@ -14,15 +14,14 @@ KG_ASSERTION_SCHEMA_REF_V0 = "abstractsemantics:kg_assertion_schema_v0"
 
 # Small, deterministic alias set for predicates that LLMs tend to emit by default.
 #
-# These are *not* part of the canonical semantics registry; they are accepted as
-# structured-output enum values and should be normalized to canonical predicates
-# before persisting to the KG.
+# These are *not* part of the canonical semantics registry. Prefer keeping
+# structured-output enums canonical (so the model is forced to pick from the
+# agreed semantics). Alias handling belongs at the ingestion boundary.
 #
 # Keep this list intentionally small to protect model context + reduce confusion.
 KG_PREDICATE_ALIASES_V0: Sequence[str] = (
     "schema:description",
     "schema:creator",
-    "schema:awareness",  # normalize to schema:knowsAbout
     "schema:hasParent",
     "schema:hasMember",
     "schema:recognizedAs",
@@ -51,7 +50,9 @@ def _dedup_preserve_order(values: Sequence[str]) -> list[str]:
 def build_kg_assertion_schema_v0(
     registry: Optional[SemanticsRegistry] = None,
     *,
-    include_predicate_aliases: bool = True,
+    include_predicate_aliases: bool = False,
+    max_assertions: int = 12,
+    min_assertions_when_nonempty: int = 3,
     max_evidence_quote_len: int = 160,
     max_original_context_len: int = 280,
 ) -> Dict[str, Any]:
@@ -77,35 +78,50 @@ def build_kg_assertion_schema_v0(
     if not entity_type_ids:
         raise ValueError("Semantics registry provided no entity type ids")
 
+    max_assertions2 = max(0, int(max_assertions))
+    min_nonempty2 = max(0, int(min_assertions_when_nonempty))
+    if max_assertions2 and min_nonempty2 and min_nonempty2 > max_assertions2:
+        min_nonempty2 = max_assertions2
+
+    assertions_schema: Dict[str, Any] = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string"},
+                "predicate": {"type": "string", "enum": predicate_ids},
+                "object": {"type": "string"},
+                "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                "valid_from": {"type": ["string", "null"]},
+                "valid_until": {"type": ["string", "null"]},
+                "provenance": {"type": ["object", "null"]},
+                "attributes": {
+                    "type": "object",
+                    "properties": {
+                        "subject_type": {"type": "string", "enum": entity_type_ids},
+                        "object_type": {"type": "string", "enum": entity_type_ids},
+                        "evidence_quote": {"type": "string", "maxLength": int(max_evidence_quote_len)},
+                        "original_context": {"type": "string", "maxLength": int(max_original_context_len)},
+                    },
+                    "required": ["evidence_quote"],
+                },
+            },
+            "required": ["subject", "predicate", "object", "attributes"],
+        },
+    }
+
+    if max_assertions2:
+        assertions_schema["maxItems"] = max_assertions2
+    if min_nonempty2:
+        # Either:
+        # - empty list (no facts), OR
+        # - at least N assertions (avoid low-signal singletons that “technically” validate).
+        assertions_schema["anyOf"] = [{"maxItems": 0}, {"minItems": min_nonempty2}]
+
     return {
         "type": "object",
         "properties": {
-            "assertions": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "subject": {"type": "string"},
-                        "predicate": {"type": "string", "enum": predicate_ids},
-                        "object": {"type": "string"},
-                        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
-                        "valid_from": {"type": ["string", "null"]},
-                        "valid_until": {"type": ["string", "null"]},
-                        "provenance": {"type": ["object", "null"]},
-                        "attributes": {
-                            "type": "object",
-                            "properties": {
-                                "subject_type": {"type": "string", "enum": entity_type_ids},
-                                "object_type": {"type": "string", "enum": entity_type_ids},
-                                "evidence_quote": {"type": "string", "maxLength": int(max_evidence_quote_len)},
-                                "original_context": {"type": "string", "maxLength": int(max_original_context_len)},
-                            },
-                            "required": ["evidence_quote"],
-                        },
-                    },
-                    "required": ["subject", "predicate", "object", "attributes"],
-                },
-            }
+            "assertions": assertions_schema
         },
         "required": ["assertions"],
     }
@@ -118,4 +134,3 @@ def resolve_schema_ref(schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if ref.strip() == KG_ASSERTION_SCHEMA_REF_V0:
             return build_kg_assertion_schema_v0()
     return None
-
