@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractsemantics"
-version = "0.0.1"
+version = "0.0.2"
 description = "Semantics registry (predicates/types) for AbstractFramework."
 readme = "README.md"
 requires-python = ">=3.10"

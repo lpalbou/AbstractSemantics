@@ -72,6 +72,14 @@ Start with:
 - `docs/architecture.md` (what exists in this repo, with diagrams)
 - `docs/registry.md` (registry YAML format)
 - `docs/schema.md` (KG assertion JSON Schema + `$ref`)
+- `docs/faq.md` (common questions and troubleshooting)
+
+## Project
+
+- Changelog: `CHANGELOD.md`
+- Contributing: `CONTRIBUTING.md`
+- Security: `SECURITY.md`
+- Acknowledgments: `ACKNOWLEDMENTS.md`
 
 ## License
 

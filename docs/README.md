@@ -9,8 +9,17 @@
 - [Architecture](architecture.md): components, data flow, and diagrams
 - [Registry format](registry.md): YAML shape and loader behavior
 - [KG assertion JSON Schema](schema.md): schema builder and `$ref` resolver
+- [FAQ](faq.md): common questions and troubleshooting
 - [API reference](api.md): public API surface (what `abstractsemantics.__init__` exports)
 - [Development](development.md): tests, builds, release checklist
+
+## Project docs
+
+- [Changelog](../CHANGELOD.md)
+- [Contributing](../CONTRIBUTING.md)
+- [Security policy](../SECURITY.md)
+- [Acknowledgments](../ACKNOWLEDMENTS.md)
+- [License](../LICENSE)
 
 ## Source of truth (code)
 

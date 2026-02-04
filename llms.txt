@@ -4,14 +4,24 @@
 
 Repository-relative links are used below.
 
+Key behavior notes (source of truth: `src/abstractsemantics/`):
+- Default registry is packaged as `abstractsemantics/semantics.yaml` (override via `ABSTRACTSEMANTICS_REGISTRY_PATH`).
+- `$ref` resolution uses schema builder defaults (`resolve_schema_ref()` calls `build_kg_assertion_schema_v0()` with default args; predicate aliases are off unless you build directly).
+
 ## Docs
 
 - [README](README.md): install, quickstart, and project scope
+- [Changelog](CHANGELOD.md): release notes
+- [Contributing](CONTRIBUTING.md): development and PR guidelines
+- [Security policy](SECURITY.md): responsible vulnerability reporting
+- [Acknowledgments](ACKNOWLEDMENTS.md): credits and upstream projects/standards
+- [License](LICENSE): license terms
 - [Getting started](docs/getting-started.md): install, load registry, build schema, `$ref` resolution
 - [Documentation index](docs/README.md): table of contents for all docs
 - [Architecture](docs/architecture.md): components + diagrams
 - [Registry format](docs/registry.md): YAML format and loader behavior
 - [KG assertion JSON Schema](docs/schema.md): schema builder + `$ref` resolution
+- [FAQ](docs/faq.md): common questions and troubleshooting
 - [API reference](docs/api.md): public API surface
 - [Development](docs/development.md): tests and packaging
 

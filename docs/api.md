@@ -8,7 +8,7 @@
   - `predicate_ids() -> set[str]`
   - `entity_type_ids() -> set[str]`
 - `resolve_semantics_registry_path() -> pathlib.Path`
-  - default: `src/abstractsemantics/semantics.yaml`
+  - default: `abstractsemantics/semantics.yaml` (in this repo: `src/abstractsemantics/semantics.yaml`)
   - override: `ABSTRACTSEMANTICS_REGISTRY_PATH`
 - `load_semantics_registry(path: pathlib.Path | None = None) -> SemanticsRegistry`
 
@@ -25,3 +25,4 @@
 - [Architecture](architecture.md)
 - [Registry format](registry.md)
 - [KG assertion JSON Schema](schema.md)
+- [FAQ](faq.md)

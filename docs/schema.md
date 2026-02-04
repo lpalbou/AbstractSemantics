@@ -65,4 +65,5 @@ See `src/abstractsemantics/schema.py` for the authoritative dict.
 
 - [Getting started](getting-started.md)
 - [Registry format](registry.md)
+- [FAQ](faq.md)
 - [API reference](api.md)

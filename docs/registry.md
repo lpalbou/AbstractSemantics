@@ -4,7 +4,7 @@
 
 ## Where it lives
 
-- Default, packaged registry: `src/abstractsemantics/semantics.yaml`
+- Default, packaged registry: `abstractsemantics/semantics.yaml` (in this repo: `src/abstractsemantics/semantics.yaml`)
 - Override location at runtime: environment variable `ABSTRACTSEMANTICS_REGISTRY_PATH` (implemented by `resolve_semantics_registry_path()` in `src/abstractsemantics/registry.py`)
 
 If `ABSTRACTSEMANTICS_REGISTRY_PATH` is set and points to a non-existent file, `resolve_semantics_registry_path()` raises `FileNotFoundError`.
@@ -81,4 +81,5 @@ print(sorted(reg.entity_type_ids())[:5])
 - [Getting started](getting-started.md)
 - [Architecture](architecture.md)
 - [KG assertion JSON Schema](schema.md)
+- [FAQ](faq.md)
 - [Semantic triple prompt (guide)](guide/semantics/semantic-triple-prompt-v4-optimized.md)

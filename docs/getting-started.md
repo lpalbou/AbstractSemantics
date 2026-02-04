@@ -97,4 +97,5 @@ The loader is tolerant (skips invalid items) but requires at least one valid pre
 - [Architecture](architecture.md)
 - [Registry format](registry.md)
 - [KG assertion JSON Schema](schema.md)
+- [FAQ](faq.md)
 - [API reference](api.md)

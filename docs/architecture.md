@@ -5,7 +5,7 @@
 ## What exists in this repo
 
 Core files:
-- Registry YAML (packaged as data): `src/abstractsemantics/semantics.yaml`
+- Registry YAML (packaged as data): `abstractsemantics/semantics.yaml` (in this repo: `src/abstractsemantics/semantics.yaml`)
 - Loader + dataclasses: `src/abstractsemantics/registry.py`
 - JSON Schema helpers: `src/abstractsemantics/schema.py`
 - Public exports: `src/abstractsemantics/__init__.py`
@@ -59,4 +59,5 @@ flowchart LR
 - [Getting started](getting-started.md)
 - [Registry format](registry.md)
 - [KG assertion JSON Schema](schema.md)
+- [FAQ](faq.md)
 - [API reference](api.md)

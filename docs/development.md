@@ -37,10 +37,12 @@ python scripts/generate_llms_full.py
 
 ## Release checklist (docs-first)
 
+- Update `pyproject.toml` version (and `CHANGELOD.md`)
 - Update `src/abstractsemantics/semantics.yaml` (registry changes)
 - Ensure docs reflect behavior (`docs/`)
 - Run `pytest`
 - Build with `python -m build`
+- Regenerate `llms-full.txt` (`python scripts/generate_llms_full.py`)
 
 ## Related docs
 
@@ -49,3 +51,4 @@ python scripts/generate_llms_full.py
 - [Architecture](architecture.md)
 - [Registry format](registry.md)
 - [KG assertion JSON Schema](schema.md)
+- [FAQ](faq.md)
