@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+FILES_IN_ORDER = [
+    "README.md",
+    "docs/getting-started.md",
+    "docs/README.md",
+    "docs/architecture.md",
+    "docs/registry.md",
+    "docs/schema.md",
+    "docs/api.md",
+    "docs/development.md",
+    "docs/guide/semantics/semantic-triple-prompt-v4-optimized.md",
+    "pyproject.toml",
+    "src/abstractsemantics/semantics.yaml",
+    "src/abstractsemantics/__init__.py",
+    "src/abstractsemantics/registry.py",
+    "src/abstractsemantics/schema.py",
+    "tests/test_registry.py",
+    "tests/test_schema.py",
+]
+
+LANG_BY_SUFFIX = {
+    ".py": "python",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".toml": "toml",
+}
+
+
+def _render_file(path: Path) -> str:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    content = path.read_text(encoding="utf-8").rstrip() + "\n"
+
+    lang = LANG_BY_SUFFIX.get(path.suffix)
+    if lang:
+        return f"## {rel}\n\n```{lang}\n{content}```\n"
+    return f"## {rel}\n\n{content}\n"
+
+
+def main() -> None:
+    missing = [p for p in FILES_IN_ORDER if not (REPO_ROOT / p).exists()]
+    if missing:
+        raise SystemExit(f"Missing files: {', '.join(missing)}")
+
+    included_list = "\n".join([f"- `{p}`" for p in FILES_IN_ORDER])
+    parts: list[str] = [
+        "# abstractsemantics (full context)\n",
+        "> Single-file, LLM-friendly snapshot of the `abstractsemantics` docs and key source files. Prefer `llms.txt` for a curated manifest of links.\n\n",
+        "Included files, in order:\n",
+        f"{included_list}\n\n",
+    ]
+
+    for rel in FILES_IN_ORDER:
+        parts.append("---\n\n")
+        parts.append(_render_file(REPO_ROOT / rel))
+
+    out = "".join(parts).rstrip() + "\n"
+    (REPO_ROOT / "llms-full.txt").write_text(out, encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
+

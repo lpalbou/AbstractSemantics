@@ -1,0 +1,1154 @@
+# abstractsemantics (full context)
+> Single-file, LLM-friendly snapshot of the `abstractsemantics` docs and key source files. Prefer `llms.txt` for a curated manifest of links.
+
+Included files, in order:
+- `README.md`
+- `docs/getting-started.md`
+- `docs/README.md`
+- `docs/architecture.md`
+- `docs/registry.md`
+- `docs/schema.md`
+- `docs/api.md`
+- `docs/development.md`
+- `docs/guide/semantics/semantic-triple-prompt-v4-optimized.md`
+- `pyproject.toml`
+- `src/abstractsemantics/semantics.yaml`
+- `src/abstractsemantics/__init__.py`
+- `src/abstractsemantics/registry.py`
+- `src/abstractsemantics/schema.py`
+- `tests/test_registry.py`
+- `tests/test_schema.py`
+
+---
+
+## README.md
+
+# AbstractSemantics (`abstractsemantics`)
+
+Central, editable semantics registry (predicates + entity types) for AbstractFramework, with helpers to build a compact JSON Schema for knowledge-graph (KG) assertion structured outputs.
+
+This package intentionally contains **definitions**, not storage:
+- prefix mappings (CURIE namespaces)
+- predicate allowlists (optional inverse pointers)
+- entity-type allowlists
+
+## Status
+
+Small, dependency-light package (only PyYAML) with a tiny public API:
+- the default registry is shipped as package data (`abstractsemantics/semantics.yaml`; in this repo: `src/abstractsemantics/semantics.yaml`)
+- the loader returns immutable dataclasses (`SemanticsRegistry`)
+- the v0 schema builder produces a deterministic JSON Schema dict
+
+## Install
+
+From PyPI:
+
+```bash
+pip install abstractsemantics
+```
+
+From source (editable, with test deps):
+
+```bash
+pip install -e ".[dev]"
+```
+
+Requires Python `>=3.10` (see `pyproject.toml`).
+
+## Quickstart
+
+Load the default registry and build the v0 structured-output schema:
+
+```python
+from abstractsemantics import load_semantics_registry, build_kg_assertion_schema_v0
+
+reg = load_semantics_registry()
+print(len(reg.predicates), len(reg.entity_types))
+
+schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+```
+
+Use a custom registry YAML (must exist on disk):
+
+```bash
+export ABSTRACTSEMANTICS_REGISTRY_PATH=/absolute/path/to/semantics.yaml
+```
+
+```python
+from abstractsemantics import load_semantics_registry
+
+reg = load_semantics_registry()  # loads from ABSTRACTSEMANTICS_REGISTRY_PATH if set
+```
+
+Note: `load_semantics_registry()` only requires at least 1 predicate, but `build_kg_assertion_schema_v0()` requires both predicate ids **and** entity-type ids (it raises `ValueError` if `entity_types` is empty).
+
+## Intended consumers (external)
+
+This package is designed to be consumed by:
+- AbstractRuntime (validation at ingestion boundary)
+- AbstractFlow (UI dropdowns + authoring support)
+- AbstractMemory (storage/query on top of validated semantics)
+
+## Documentation
+
+Start with:
+- `docs/getting-started.md` (recommended entrypoint)
+- `docs/README.md` (documentation index)
+- `docs/architecture.md` (what exists in this repo, with diagrams)
+- `docs/registry.md` (registry YAML format)
+- `docs/schema.md` (KG assertion JSON Schema + `$ref`)
+
+## License
+
+MIT (see `LICENSE`).
+
+---
+
+## docs/getting-started.md
+
+# Getting started
+
+> `abstractsemantics` provides (1) a YAML semantics registry and (2) helpers to turn that registry into a compact JSON Schema for knowledge-graph (KG) assertion structured outputs.
+
+## Install
+
+```bash
+pip install abstractsemantics
+```
+
+For local development/tests:
+
+```bash
+pip install -e ".[dev]"
+```
+
+## Load the registry
+
+The default registry is shipped inside the package (next to the Python module). In this repo it lives at `src/abstractsemantics/semantics.yaml` and is resolved by `resolve_semantics_registry_path()` in `src/abstractsemantics/registry.py`.
+
+```python
+from abstractsemantics import load_semantics_registry
+
+reg = load_semantics_registry()
+print(len(reg.predicates), len(reg.entity_types))
+```
+
+List the allowed ids:
+
+```python
+print(sorted(reg.predicate_ids())[:10])
+print(sorted(reg.entity_type_ids())[:10])
+```
+
+## Build the v0 “KG assertion” JSON Schema
+
+`build_kg_assertion_schema_v0()` (in `src/abstractsemantics/schema.py`) returns a plain Python `dict` containing a JSON Schema for structured outputs.
+
+```python
+from abstractsemantics import build_kg_assertion_schema_v0, load_semantics_registry
+
+reg = load_semantics_registry()
+schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+```
+
+Notes (defaults are in code):
+- `predicate` is restricted to registry predicate ids (optionally plus a small alias list).
+- `attributes.subject_type` / `attributes.object_type` are restricted to registry entity-type ids.
+- The default schema caps output size and avoids low-signal singletons: it allows either `[]` or at least 3 assertions.
+
+You can tune these bounds via arguments (see `build_kg_assertion_schema_v0()` in `src/abstractsemantics/schema.py`):
+
+```python
+schema = build_kg_assertion_schema_v0(max_assertions=25, min_assertions_when_nonempty=1)
+```
+
+See [KG assertion JSON Schema](schema.md) for details.
+
+## Use `$ref` and resolve it
+
+Workflows can reference the schema by a stable `$ref` string and resolve it at runtime:
+
+```python
+from abstractsemantics import KG_ASSERTION_SCHEMA_REF_V0, resolve_schema_ref
+
+resolved = resolve_schema_ref({"$ref": KG_ASSERTION_SCHEMA_REF_V0})
+assert isinstance(resolved, dict)
+```
+
+`resolve_schema_ref()` resolves the schema with default builder arguments. If you need non-default bounds or predicate aliases, call `build_kg_assertion_schema_v0(...)` directly.
+
+## Use a custom registry file
+
+You can point the loader (and therefore the schema builder) at a custom YAML file.
+
+Option A: environment variable (checked by `resolve_semantics_registry_path()`):
+
+```bash
+export ABSTRACTSEMANTICS_REGISTRY_PATH=/absolute/path/to/semantics.yaml
+```
+
+Option B: explicit path argument:
+
+```python
+from pathlib import Path
+from abstractsemantics import load_semantics_registry
+
+reg = load_semantics_registry(Path("/absolute/path/to/semantics.yaml"))
+```
+
+If you pass an explicit `path`, the environment variable is ignored (`load_semantics_registry()` uses `path or resolve_semantics_registry_path()`).
+
+The loader is tolerant (skips invalid items) but requires at least one valid predicate id; see [Registry format](registry.md).
+
+## Next
+
+- [Architecture](architecture.md)
+- [Registry format](registry.md)
+- [KG assertion JSON Schema](schema.md)
+- [API reference](api.md)
+
+---
+
+## docs/README.md
+
+# Documentation
+
+> This folder documents the `abstractsemantics` Python package: what it is, how the registry works, and how to use the v0 JSON Schema helpers.
+
+## Start here
+
+- [Project README](../README.md): install + quickstart
+- [Getting started](getting-started.md): install, load registry, build schema, `$ref` resolution
+- [Architecture](architecture.md): components, data flow, and diagrams
+- [Registry format](registry.md): YAML shape and loader behavior
+- [KG assertion JSON Schema](schema.md): schema builder and `$ref` resolver
+- [API reference](api.md): public API surface (what `abstractsemantics.__init__` exports)
+- [Development](development.md): tests, builds, release checklist
+
+## Source of truth (code)
+
+- Default registry: [`src/abstractsemantics/semantics.yaml`](../src/abstractsemantics/semantics.yaml)
+- Loader implementation: [`src/abstractsemantics/registry.py`](../src/abstractsemantics/registry.py)
+- Schema builder: [`src/abstractsemantics/schema.py`](../src/abstractsemantics/schema.py)
+
+---
+
+## docs/architecture.md
+
+# Architecture
+
+> `abstractsemantics` is a small library: a YAML semantics registry plus helper utilities to build a compact JSON Schema. It does not store data, run workflows, or make network calls.
+
+## What exists in this repo
+
+Core files:
+- Registry YAML (packaged as data): `src/abstractsemantics/semantics.yaml`
+- Loader + dataclasses: `src/abstractsemantics/registry.py`
+- JSON Schema helpers: `src/abstractsemantics/schema.py`
+- Public exports: `src/abstractsemantics/__init__.py`
+
+## Data flow
+
+1. `load_semantics_registry()` reads YAML (default file or `ABSTRACTSEMANTICS_REGISTRY_PATH`) and returns `SemanticsRegistry`.
+2. `build_kg_assertion_schema_v0()` uses the registry ids to build a deterministic JSON Schema dict.
+3. Consumers can reference the schema by `$ref` and resolve it via `resolve_schema_ref()`.
+
+## Diagram (components + flow)
+
+```mermaid
+flowchart LR
+  subgraph Package[abstractsemantics (this package)]
+    YAML[src/abstractsemantics/semantics.yaml]
+    Loader[registry.load_semantics_registry()]
+    Reg[SemanticsRegistry]
+    Builder[schema.build_kg_assertion_schema_v0()]
+    Ref[schema.resolve_schema_ref()]
+  end
+
+  YAML --> Loader --> Reg --> Builder
+  Ref --> Builder
+  Builder --> JsonSchema[JSON Schema dict]
+
+  subgraph Consumers[Typical consumers (external to this repo)]
+    Runtime[Runtime / ingestion validation]
+    Flow[UI authoring / dropdowns]
+    Memory[Storage / query layers]
+  end
+
+  Reg --> Runtime
+  Reg --> Flow
+  Reg --> Memory
+  JsonSchema --> Runtime
+  JsonSchema --> Flow
+```
+
+## Design notes (grounded in code)
+
+- Registry ids are treated as opaque strings (typically CURIEs). This package does not expand ids into full IRIs; it just loads and exposes them (`SemanticsRegistry.prefixes`, `PredicateDef.id`, `EntityTypeDef.id`).
+- Loader is tolerant by design: unknown keys are ignored and invalid items are skipped (see parsing in `registry.load_semantics_registry()`).
+- The v0 KG schema is intentionally small and bounded (see the `max_*` args in `schema.build_kg_assertion_schema_v0()`), and it enforces:
+  - `predicate` ∈ registry predicate ids (optionally plus a small alias set)
+  - `subject_type` / `object_type` ∈ registry entity-type ids
+  - short evidence fields (`maxLength` caps)
+
+## See also
+
+- [Getting started](getting-started.md)
+- [Registry format](registry.md)
+- [KG assertion JSON Schema](schema.md)
+- [API reference](api.md)
+
+---
+
+## docs/registry.md
+
+# Semantics registry format (`semantics.yaml`)
+
+> The semantics registry is a YAML file that defines the predicate ids and entity-type ids that upstream systems are allowed to emit/ingest.
+
+## Where it lives
+
+- Default, packaged registry: `src/abstractsemantics/semantics.yaml`
+- Override location at runtime: environment variable `ABSTRACTSEMANTICS_REGISTRY_PATH` (implemented by `resolve_semantics_registry_path()` in `src/abstractsemantics/registry.py`)
+
+If `ABSTRACTSEMANTICS_REGISTRY_PATH` is set and points to a non-existent file, `resolve_semantics_registry_path()` raises `FileNotFoundError`.
+
+## Top-level keys
+
+`load_semantics_registry()` (in `src/abstractsemantics/registry.py`) loads YAML via `yaml.safe_load()` and accepts these top-level keys:
+
+- `version`: integer-ish (casts via `int()`; defaults to `0`)
+- `prefixes`: mapping `prefix -> namespace_iri` (strings only)
+- `predicates`: list of predicate definitions (must contain at least 1 valid entry)
+- `entity_types`: list of entity-type definitions (may be empty, but some workflows require it)
+
+Unknown keys are ignored.
+
+## Loader behavior (what is and is not validated)
+
+The loader is intentionally permissive (see `src/abstractsemantics/registry.py`):
+
+- It does **not** expand CURIEs into IRIs (prefixes are loaded but not applied).
+- It does **not** validate cross-references:
+  - `PredicateDef.inverse` is not checked to exist in `predicates`.
+  - `EntityTypeDef.parent` is not checked to exist in `entity_types`.
+- It preserves list order and does not deduplicate entries (use `predicate_ids()` / `entity_type_ids()` if you only need the unique ids).
+
+## Predicate definitions
+
+Each item under `predicates` becomes a `PredicateDef` dataclass instance with:
+
+- `id` (required): string, typically a CURIE like `dcterms:isPartOf` or `rdf:type`
+- `label` (optional): string
+- `inverse` (optional): string (points to another predicate id)
+- `description` (optional): string
+
+Invalid items are skipped. If no valid predicates remain, `load_semantics_registry()` raises `ValueError`.
+
+## Entity-type definitions
+
+Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance with:
+
+- `id` (required): string, typically a CURIE like `schema:Person`
+- `label` (optional): string
+- `parent` (optional): string (points to another type id)
+- `description` (optional): string
+
+Invalid items are skipped. The registry loader does not currently require entity types to be present; however, `build_kg_assertion_schema_v0()` raises `ValueError` if the provided registry has no entity types.
+
+## Minimal example
+
+```yaml
+version: 0
+prefixes:
+  schema: "https://schema.org/"
+predicates:
+  - id: "schema:name"
+    label: "name"
+entity_types:
+  - id: "schema:Thing"
+    label: "Thing"
+```
+
+## Working with the registry in Python
+
+```python
+from abstractsemantics import load_semantics_registry
+
+reg = load_semantics_registry()
+print(sorted(reg.predicate_ids())[:5])
+print(sorted(reg.entity_type_ids())[:5])
+```
+
+## Related docs
+
+- [Getting started](getting-started.md)
+- [Architecture](architecture.md)
+- [KG assertion JSON Schema](schema.md)
+- [Semantic triple prompt (guide)](guide/semantics/semantic-triple-prompt-v4-optimized.md)
+
+---
+
+## docs/schema.md
+
+# KG assertion JSON Schema (v0)
+
+> `abstractsemantics` includes a small helper to build a compact JSON Schema dict intended for LLM structured outputs in knowledge-extraction workflows (knowledge-graph “assertions”).
+
+## Stable schema reference (`$ref`)
+
+`src/abstractsemantics/schema.py` defines a stable reference string:
+
+- `KG_ASSERTION_SCHEMA_REF_V0 = "abstractsemantics:kg_assertion_schema_v0"`
+
+`resolve_schema_ref()` accepts a dict like `{"$ref": KG_ASSERTION_SCHEMA_REF_V0}` and returns the concrete JSON Schema dict (or `None` if unsupported).
+
+Note: `resolve_schema_ref()` resolves to `build_kg_assertion_schema_v0()` with its **default arguments** (so predicate aliases are disabled unless you build the schema directly).
+
+## Building the schema directly
+
+```python
+from abstractsemantics import build_kg_assertion_schema_v0, load_semantics_registry
+
+reg = load_semantics_registry()
+schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+```
+
+## Tuning output constraints
+
+The schema is designed to be bounded by default. You can tune limits via function arguments:
+
+```python
+from abstractsemantics import build_kg_assertion_schema_v0
+
+schema = build_kg_assertion_schema_v0(
+    include_predicate_aliases=False,
+    max_assertions=20,
+    min_assertions_when_nonempty=1,
+    max_evidence_quote_len=200,
+    max_original_context_len=400,
+)
+```
+
+### What it enforces (grounded in code)
+
+`build_kg_assertion_schema_v0()`:
+
+- restricts `predicate` to `registry.predicates[*].id` (and optionally a small alias list: `KG_PREDICATE_ALIASES_V0`)
+- restricts `attributes.subject_type` and `attributes.object_type` to `registry.entity_types[*].id`
+- requires each assertion to include:
+  - `subject`, `predicate`, `object`
+  - `attributes.evidence_quote` (short verbatim snippet)
+- bounds evidence fields with `maxLength` (see `max_evidence_quote_len` and `max_original_context_len`)
+- optionally bounds the number of assertions:
+  - `max_assertions` via `maxItems`
+  - if `min_assertions_when_nonempty > 0`, the schema allows either an empty list OR at least N assertions (an `anyOf` guard)
+
+If the registry has no predicate ids or no entity-type ids, it raises `ValueError`.
+
+## Schema shape (high level)
+
+The returned object schema has the shape:
+
+- `{ "assertions": [ { subject, predicate, object, confidence?, valid_from?, ... , attributes: {...} } ] }`
+
+See `src/abstractsemantics/schema.py` for the authoritative dict.
+
+## Related docs
+
+- [Getting started](getting-started.md)
+- [Registry format](registry.md)
+- [API reference](api.md)
+
+---
+
+## docs/api.md
+
+# API reference
+
+> Prefer importing from `abstractsemantics` (re-exported from `src/abstractsemantics/__init__.py`). Direct submodule imports may change.
+
+## Registry
+
+- `SemanticsRegistry`: frozen dataclass with fields `version`, `prefixes`, `predicates`, `entity_types`
+  - `predicate_ids() -> set[str]`
+  - `entity_type_ids() -> set[str]`
+- `resolve_semantics_registry_path() -> pathlib.Path`
+  - default: `src/abstractsemantics/semantics.yaml`
+  - override: `ABSTRACTSEMANTICS_REGISTRY_PATH`
+- `load_semantics_registry(path: pathlib.Path | None = None) -> SemanticsRegistry`
+
+## JSON Schema helpers
+
+- `KG_ASSERTION_SCHEMA_REF_V0: str`
+- `build_kg_assertion_schema_v0(...) -> dict`
+  - important args: `include_predicate_aliases`, `max_assertions`, `min_assertions_when_nonempty`
+- `resolve_schema_ref(schema: dict) -> dict | None`
+
+## Related docs
+
+- [Getting started](getting-started.md)
+- [Architecture](architecture.md)
+- [Registry format](registry.md)
+- [KG assertion JSON Schema](schema.md)
+
+---
+
+## docs/development.md
+
+# Development
+
+## Local setup
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+## Run tests
+
+```bash
+pytest
+```
+
+Tests are in `tests/` and cover:
+- registry loading (`tests/test_registry.py`)
+- schema construction and `$ref` resolution (`tests/test_schema.py`)
+
+## Build distributions (sdist + wheel)
+
+```bash
+python -m pip install -U build
+python -m build
+```
+
+Outputs are written to `dist/` (ignored by git via `.gitignore`).
+
+## Regenerate `llms-full.txt`
+
+`llms-full.txt` is a generated “single file context” snapshot (see `scripts/generate_llms_full.py`).
+
+```bash
+python scripts/generate_llms_full.py
+```
+
+## Release checklist (docs-first)
+
+- Update `src/abstractsemantics/semantics.yaml` (registry changes)
+- Ensure docs reflect behavior (`docs/`)
+- Run `pytest`
+- Build with `python -m build`
+
+## Related docs
+
+- [Documentation index](README.md)
+- [Getting started](getting-started.md)
+- [Architecture](architecture.md)
+- [Registry format](registry.md)
+- [KG assertion JSON Schema](schema.md)
+
+---
+
+## docs/guide/semantics/semantic-triple-prompt-v4-optimized.md
+
+# Semantic triple prompt (v4, optimized)
+
+> Prompt template for LLM-based extraction workflows that need to emit facts aligned to the `abstractsemantics` registry. This file is guidance for humans/agents; it is not used by the `abstractsemantics` Python package at runtime.
+
+## Inputs
+
+- Registry (source of truth): `src/abstractsemantics/semantics.yaml`
+- Suggested structured-output schema: `abstractsemantics:kg_assertion_schema_v0` (see `docs/schema.md`)
+
+## Prompt template
+
+System / developer message:
+
+> You extract knowledge-graph assertions from the provided text. Output **only** JSON that conforms to the JSON Schema. Use only predicate ids and entity-type ids from the provided semantics registry. Every assertion must include an `attributes.evidence_quote` copied verbatim from the text.
+>
+> If you cannot extract any high-confidence facts, output `{"assertions": []}`. Otherwise, output **at least 3** assertions.
+>
+> Keep `attributes.evidence_quote` short (ideally one sentence fragment) and include `attributes.original_context` only when needed.
+
+User message (example):
+
+> Registry: (attach `semantics.yaml`)
+>
+> Schema: `{"$ref": "abstractsemantics:kg_assertion_schema_v0"}`
+>
+> Text:
+> (paste text here)
+
+## Output guidelines (aligned to the v0 schema)
+
+- `subject`, `predicate`, `object`: required strings
+- `attributes.evidence_quote`: required string (verbatim from text)
+- `attributes.subject_type` / `attributes.object_type`: include when you can map to a registry type id
+- `confidence`: number in `[0, 1]` or `null`
+- Prefer fewer, higher-signal assertions over many weak ones (the schema caps list size by default)
+
+## Related docs
+
+- [Registry format](../../registry.md)
+- [KG assertion JSON Schema](../../schema.md)
+
+---
+
+## pyproject.toml
+
+```toml
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abstractsemantics"
+version = "0.0.1"
+description = "Semantics registry (predicates/types) for AbstractFramework."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Laurent-Philippe Albou" }]
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["abstractsemantics*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+abstractsemantics = ["*.yaml", "*.yml"]
+```
+---
+
+## src/abstractsemantics/semantics.yaml
+
+```yaml
+version: 0
+
+prefixes:
+  dcterms: "http://purl.org/dc/terms/"
+  schema: "https://schema.org/"
+  skos: "http://www.w3.org/2004/02/skos/core#"
+  cito: "http://purl.org/spar/cito/"
+  rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  ex: "http://example.org/"
+
+# v0 policy: predicate allowlist for ingestion validation + UI dropdowns.
+# Source: docs/guide/semantics/semantic-triple-prompt-v4-optimized.md (preferred predicates)
+predicates:
+  - id: "rdf:type"
+    label: "type"
+    description: "Class membership (entity -> class)."
+
+  # Structure
+  - id: "dcterms:hasPart"
+    label: "has part"
+    inverse: "dcterms:isPartOf"
+  - id: "dcterms:isPartOf"
+    label: "is part of"
+    inverse: "dcterms:hasPart"
+  - id: "schema:nextItem"
+    label: "next item"
+    inverse: "schema:previousItem"
+  - id: "schema:previousItem"
+    label: "previous item"
+    inverse: "schema:nextItem"
+
+  # Metadata
+  - id: "dcterms:identifier"
+    label: "identifier"
+  - id: "dcterms:title"
+    label: "title"
+  - id: "schema:name"
+    label: "name"
+    description: "Primary label for non-document entities (agents, events, places, etc.)."
+  - id: "dcterms:description"
+    label: "description"
+  - id: "dcterms:abstract"
+    label: "abstract"
+  - id: "dcterms:created"
+    label: "created"
+  - id: "dcterms:modified"
+    label: "modified"
+  - id: "dcterms:creator"
+    label: "creator"
+  - id: "dcterms:publisher"
+    label: "publisher"
+  - id: "dcterms:subject"
+    label: "subject"
+  - id: "schema:genre"
+    label: "genre"
+
+  # Context & anchors
+  - id: "schema:about"
+    label: "about"
+  - id: "schema:mentions"
+    label: "mentions"
+  - id: "schema:knowsAbout"
+    label: "knows about"
+    description: "An agent's knowledge/awareness about a topic or entity (stronger than incidental mentions)."
+  - id: "dcterms:references"
+    label: "references"
+  - id: "schema:sameAs"
+    label: "same as"
+  - id: "schema:location"
+    label: "location"
+  - id: "schema:temporalCoverage"
+    label: "temporal coverage"
+
+  # Action & participants
+  - id: "schema:participant"
+    label: "participant"
+  - id: "schema:organizer"
+    label: "organizer"
+  - id: "schema:result"
+    label: "result"
+  - id: "schema:instrument"
+    label: "instrument"
+  - id: "schema:startDate"
+    label: "start date"
+  - id: "schema:endDate"
+    label: "end date"
+
+  # Concepts
+  - id: "skos:definition"
+    label: "definition"
+  - id: "skos:prefLabel"
+    label: "preferred label"
+  - id: "skos:altLabel"
+    label: "alternative label"
+  - id: "skos:broader"
+    label: "broader"
+  - id: "skos:narrower"
+    label: "narrower"
+  - id: "skos:related"
+    label: "related"
+  - id: "skos:exactMatch"
+    label: "exact match"
+  - id: "skos:closeMatch"
+    label: "close match"
+
+  # Evidence
+  - id: "cito:supports"
+    label: "supports"
+  - id: "cito:disagreesWith"
+    label: "disagrees with"
+  - id: "cito:usesDataFrom"
+    label: "uses data from"
+    inverse: "cito:providesDataFor"
+  - id: "cito:providesDataFor"
+    label: "provides data for"
+    inverse: "cito:usesDataFrom"
+  - id: "cito:extends"
+    label: "extends"
+  - id: "cito:discusses"
+    label: "discusses"
+  - id: "cito:confirms"
+    label: "confirms"
+
+entity_types:
+  # Generic "real-world thing" catch-all (includes physical objects).
+  - id: "schema:Thing"
+    label: "Thing"
+
+  - id: "dcterms:Text"
+    label: "Text"
+  - id: "dcterms:Collection"
+    label: "Collection"
+  - id: "skos:Concept"
+    label: "Concept"
+  - id: "cito:Claim"
+    label: "Claim"
+  - id: "schema:Person"
+    label: "Person"
+  - id: "schema:Organization"
+    label: "Organization"
+  - id: "schema:ItemList"
+    label: "List"
+  - id: "schema:SoftwareApplication"
+    label: "Software Application"
+  - id: "schema:Event"
+    label: "Event"
+  - id: "schema:Place"
+    label: "Place"
+  - id: "schema:Country"
+    label: "Country"
+    parent: "schema:Place"
+  - id: "schema:Product"
+    label: "Product"
+    parent: "schema:Thing"
+  - id: "schema:Dataset"
+    label: "Dataset"
+  - id: "schema:ImageObject"
+    label: "Image"
+  - id: "schema:VideoObject"
+    label: "Video"
+  - id: "schema:Table"
+    label: "Table"
+  - id: "schema:SoftwareSourceCode"
+    label: "Code"
+```
+---
+
+## src/abstractsemantics/__init__.py
+
+```python
+from .registry import (
+    SemanticsRegistry,
+    load_semantics_registry,
+    resolve_semantics_registry_path,
+)
+from .schema import (
+    KG_ASSERTION_SCHEMA_REF_V0,
+    build_kg_assertion_schema_v0,
+    resolve_schema_ref,
+)
+
+__all__ = [
+    "SemanticsRegistry",
+    "load_semantics_registry",
+    "resolve_semantics_registry_path",
+    "KG_ASSERTION_SCHEMA_REF_V0",
+    "build_kg_assertion_schema_v0",
+    "resolve_schema_ref",
+]
+```
+---
+
+## src/abstractsemantics/registry.py
+
+```python
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence
+
+import yaml
+
+
+@dataclass(frozen=True)
+class PredicateDef:
+    id: str
+    label: Optional[str] = None
+    inverse: Optional[str] = None
+    description: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class EntityTypeDef:
+    id: str
+    label: Optional[str] = None
+    parent: Optional[str] = None
+    description: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class SemanticsRegistry:
+    version: int
+    prefixes: Dict[str, str]
+    predicates: List[PredicateDef]
+    entity_types: List[EntityTypeDef]
+
+    def predicate_ids(self) -> set[str]:
+        return {p.id for p in self.predicates if isinstance(p.id, str) and p.id.strip()}
+
+    def entity_type_ids(self) -> set[str]:
+        return {t.id for t in self.entity_types if isinstance(t.id, str) and t.id.strip()}
+
+
+def resolve_semantics_registry_path() -> Path:
+    """Resolve the registry YAML path.
+
+    Env override:
+    - ABSTRACTSEMANTICS_REGISTRY_PATH
+    """
+    raw = os.getenv("ABSTRACTSEMANTICS_REGISTRY_PATH")
+    if isinstance(raw, str) and raw.strip():
+        p = Path(raw).expanduser().resolve()
+        if not p.exists():
+            raise FileNotFoundError(f"ABSTRACTSEMANTICS_REGISTRY_PATH does not exist: {p}")
+        return p
+    return Path(__file__).with_name("semantics.yaml")
+
+
+def _as_list(value: Any) -> list:
+    return list(value) if isinstance(value, list) else []
+
+
+def _load_yaml(path: Path) -> Dict[str, Any]:
+    raw = path.read_text(encoding="utf-8")
+    data = yaml.safe_load(raw)
+    return data if isinstance(data, dict) else {}
+
+
+def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
+    p = path or resolve_semantics_registry_path()
+    data = _load_yaml(p)
+
+    version_raw = data.get("version", 0)
+    try:
+        version = int(version_raw)
+    except Exception:
+        version = 0
+
+    prefixes_raw = data.get("prefixes")
+    prefixes: Dict[str, str] = {}
+    if isinstance(prefixes_raw, dict):
+        for k, v in prefixes_raw.items():
+            if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
+                prefixes[k.strip()] = v.strip()
+
+    predicates: list[PredicateDef] = []
+    for item in _as_list(data.get("predicates")):
+        if not isinstance(item, dict):
+            continue
+        pid = item.get("id")
+        if not isinstance(pid, str) or not pid.strip():
+            continue
+        predicates.append(
+            PredicateDef(
+                id=pid.strip(),
+                label=item.get("label") if isinstance(item.get("label"), str) else None,
+                inverse=item.get("inverse") if isinstance(item.get("inverse"), str) else None,
+                description=item.get("description") if isinstance(item.get("description"), str) else None,
+            )
+        )
+
+    entity_types: list[EntityTypeDef] = []
+    for item in _as_list(data.get("entity_types")):
+        if not isinstance(item, dict):
+            continue
+        tid = item.get("id")
+        if not isinstance(tid, str) or not tid.strip():
+            continue
+        entity_types.append(
+            EntityTypeDef(
+                id=tid.strip(),
+                label=item.get("label") if isinstance(item.get("label"), str) else None,
+                parent=item.get("parent") if isinstance(item.get("parent"), str) else None,
+                description=item.get("description") if isinstance(item.get("description"), str) else None,
+            )
+        )
+
+    if not predicates:
+        raise ValueError(f"Semantics registry has no predicates: {p}")
+
+    return SemanticsRegistry(
+        version=version,
+        prefixes=prefixes,
+        predicates=predicates,
+        entity_types=entity_types,
+    )
+```
+---
+
+## src/abstractsemantics/schema.py
+
+```python
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Sequence
+
+from .registry import SemanticsRegistry, load_semantics_registry
+
+# Stable reference strings for flow-authored schemas.
+#
+# Visual flows may reference these via a `json_schema` literal like:
+#   {"$ref": "abstractsemantics:kg_assertion_schema_v0"}
+# The runtime resolves them into a concrete JSON Schema dict at execution time.
+KG_ASSERTION_SCHEMA_REF_V0 = "abstractsemantics:kg_assertion_schema_v0"
+
+
+# Small, deterministic alias set for predicates that LLMs tend to emit by default.
+#
+# These are *not* part of the canonical semantics registry. Prefer keeping
+# structured-output enums canonical (so the model is forced to pick from the
+# agreed semantics). Alias handling belongs at the ingestion boundary.
+#
+# Keep this list intentionally small to protect model context + reduce confusion.
+KG_PREDICATE_ALIASES_V0: Sequence[str] = (
+    "schema:description",
+    "schema:creator",
+    "schema:hasParent",
+    "schema:hasMember",
+    "schema:recognizedAs",
+    "schema:hasMemorySource",
+    "schema:hasPart",
+    "schema:isPartOf",
+    "dcterms:has_part",
+    "dcterms:is_part_of",
+)
+
+
+def _dedup_preserve_order(values: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in values:
+        if not isinstance(v, str):
+            continue
+        v2 = v.strip()
+        if not v2 or v2 in seen:
+            continue
+        seen.add(v2)
+        out.append(v2)
+    return out
+
+
+def build_kg_assertion_schema_v0(
+    registry: Optional[SemanticsRegistry] = None,
+    *,
+    include_predicate_aliases: bool = False,
+    max_assertions: int = 12,
+    min_assertions_when_nonempty: int = 3,
+    max_evidence_quote_len: int = 160,
+    max_original_context_len: int = 280,
+) -> Dict[str, Any]:
+    """Build the structured-output JSON Schema used by the KG extractor workflows.
+
+    This schema is deliberately small and meant to be stable:
+    - `predicate` is restricted to the semantics registry (+ optional aliases).
+    - `subject_type` / `object_type` are restricted to the registry entity types.
+    - Evidence fields are bounded (short verbatim snippets).
+    """
+    reg = registry or load_semantics_registry()
+
+    predicate_ids: List[str] = [p.id for p in reg.predicates if isinstance(p.id, str) and p.id.strip()]
+    if include_predicate_aliases:
+        predicate_ids = list(predicate_ids) + list(KG_PREDICATE_ALIASES_V0)
+    predicate_ids = _dedup_preserve_order(predicate_ids)
+
+    entity_type_ids: List[str] = [t.id for t in reg.entity_types if isinstance(t.id, str) and t.id.strip()]
+    entity_type_ids = _dedup_preserve_order(entity_type_ids)
+
+    if not predicate_ids:
+        raise ValueError("Semantics registry provided no predicate ids")
+    if not entity_type_ids:
+        raise ValueError("Semantics registry provided no entity type ids")
+
+    max_assertions2 = max(0, int(max_assertions))
+    min_nonempty2 = max(0, int(min_assertions_when_nonempty))
+    if max_assertions2 and min_nonempty2 and min_nonempty2 > max_assertions2:
+        min_nonempty2 = max_assertions2
+
+    assertions_schema: Dict[str, Any] = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string"},
+                "predicate": {"type": "string", "enum": predicate_ids},
+                "object": {"type": "string"},
+                "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                "valid_from": {"type": ["string", "null"]},
+                "valid_until": {"type": ["string", "null"]},
+                "provenance": {"type": ["object", "null"]},
+                "attributes": {
+                    "type": "object",
+                    "properties": {
+                        "subject_type": {"type": "string", "enum": entity_type_ids},
+                        "object_type": {"type": "string", "enum": entity_type_ids},
+                        "evidence_quote": {"type": "string", "maxLength": int(max_evidence_quote_len)},
+                        "original_context": {"type": "string", "maxLength": int(max_original_context_len)},
+                    },
+                    "required": ["evidence_quote"],
+                },
+            },
+            "required": ["subject", "predicate", "object", "attributes"],
+        },
+    }
+
+    if max_assertions2:
+        assertions_schema["maxItems"] = max_assertions2
+    if min_nonempty2:
+        # Either:
+        # - empty list (no facts), OR
+        # - at least N assertions (avoid low-signal singletons that “technically” validate).
+        assertions_schema["anyOf"] = [{"maxItems": 0}, {"minItems": min_nonempty2}]
+
+    return {
+        "type": "object",
+        "properties": {
+            "assertions": assertions_schema
+        },
+        "required": ["assertions"],
+    }
+
+
+def resolve_schema_ref(schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Resolve a schema reference dict to a concrete JSON Schema (if supported)."""
+    ref = schema.get("$ref")
+    if isinstance(ref, str) and ref.strip():
+        if ref.strip() == KG_ASSERTION_SCHEMA_REF_V0:
+            return build_kg_assertion_schema_v0()
+    return None
+```
+---
+
+## tests/test_registry.py
+
+```python
+from __future__ import annotations
+
+from abstractsemantics import load_semantics_registry
+
+
+def test_load_semantics_registry_has_predicates():
+    reg = load_semantics_registry()
+    ids = reg.predicate_ids()
+    assert "rdf:type" in ids
+    assert "dcterms:isPartOf" in ids
+```
+---
+
+## tests/test_schema.py
+
+```python
+from __future__ import annotations
+
+from abstractsemantics import (
+    KG_ASSERTION_SCHEMA_REF_V0,
+    build_kg_assertion_schema_v0,
+    load_semantics_registry,
+    resolve_schema_ref,
+)
+
+
+def test_build_kg_assertion_schema_v0_tracks_registry_predicates_and_types() -> None:
+    reg = load_semantics_registry()
+    schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+
+    pred_enum = schema["properties"]["assertions"]["items"]["properties"]["predicate"]["enum"]
+    assert isinstance(pred_enum, list) and pred_enum
+    for pid in reg.predicate_ids():
+        assert pid in pred_enum
+
+    type_enum = schema["properties"]["assertions"]["items"]["properties"]["attributes"]["properties"]["subject_type"]["enum"]
+    assert isinstance(type_enum, list) and type_enum
+    for tid in reg.entity_type_ids():
+        assert tid in type_enum
+
+
+def test_build_kg_assertion_schema_v0_can_disable_aliases() -> None:
+    reg = load_semantics_registry()
+    schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=False)
+    pred_enum = schema["properties"]["assertions"]["items"]["properties"]["predicate"]["enum"]
+    assert "schema:creator" not in pred_enum
+    assert "schema:description" not in pred_enum
+
+
+def test_resolve_schema_ref_returns_concrete_schema() -> None:
+    resolved = resolve_schema_ref({"$ref": KG_ASSERTION_SCHEMA_REF_V0})
+    assert isinstance(resolved, dict)
+    assert resolved.get("type") == "object"
+    assert "assertions" in resolved.get("properties", {})
+```

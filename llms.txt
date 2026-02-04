@@ -1,0 +1,29 @@
+# abstractsemantics
+
+> Python package: ships a YAML semantics registry (predicate + entity-type allowlists) and JSON Schema helpers for knowledge-graph (KG) assertion structured outputs.
+
+Repository-relative links are used below.
+
+## Docs
+
+- [README](README.md): install, quickstart, and project scope
+- [Getting started](docs/getting-started.md): install, load registry, build schema, `$ref` resolution
+- [Documentation index](docs/README.md): table of contents for all docs
+- [Architecture](docs/architecture.md): components + diagrams
+- [Registry format](docs/registry.md): YAML format and loader behavior
+- [KG assertion JSON Schema](docs/schema.md): schema builder + `$ref` resolution
+- [API reference](docs/api.md): public API surface
+- [Development](docs/development.md): tests and packaging
+
+## Core files
+
+- [Default registry](src/abstractsemantics/semantics.yaml): packaged semantics registry
+- [Registry loader](src/abstractsemantics/registry.py): YAML loader + dataclasses
+- [Schema builder](src/abstractsemantics/schema.py): JSON Schema builder + `$ref` resolver
+- [Packaging metadata](pyproject.toml): Python version, dependencies, build backend
+
+## Optional
+
+- [Semantic triple prompt](docs/guide/semantics/semantic-triple-prompt-v4-optimized.md): prompt template for extraction workflows
+- [Schema tests](tests/test_schema.py): assertions that anchor expected behavior
+- [Full context snapshot](llms-full.txt): concatenation of docs + core files for offline use
