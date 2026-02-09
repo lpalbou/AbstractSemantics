@@ -2,6 +2,19 @@
 
 > `abstractsemantics` is a small library: a YAML semantics registry plus helper utilities to build a compact JSON Schema. It does not store data, run workflows, or make network calls.
 
+## Position in AbstractFramework
+
+AbstractFramework is a multi-repo ecosystem. In that ecosystem:
+
+- **AbstractCore** defines shared primitives/contracts used across components.
+- **AbstractRuntime** is typically the place where workflows execute and ingestion validation happens.
+- **abstractsemantics** (this repo) provides the shared *allowed ids* (predicates and entity types) plus a small JSON Schema helper for structured outputs.
+
+Links:
+- AbstractFramework: https://github.com/lpalbou/AbstractFramework
+- AbstractCore: https://github.com/lpalbou/abstractcore
+- AbstractRuntime: https://github.com/lpalbou/abstractruntime
+
 ## What exists in this repo
 
 Core files:
@@ -32,17 +45,15 @@ flowchart LR
   Ref --> Builder
   Builder --> JsonSchema[JSON Schema dict]
 
-  subgraph Consumers[Typical consumers (external to this repo)]
-    Runtime[Runtime / ingestion validation]
-    Flow[UI authoring / dropdowns]
-    Memory[Storage / query layers]
+  subgraph Consumers[Typical consumers (external)]
+    Runtime[AbstractRuntime / ingestion validation]
+    Other[Other tools (UIs, pipelines, storage layers)]
   end
 
   Reg --> Runtime
-  Reg --> Flow
-  Reg --> Memory
+  Reg --> Other
   JsonSchema --> Runtime
-  JsonSchema --> Flow
+  JsonSchema --> Other
 ```
 
 ## Design notes (grounded in code)

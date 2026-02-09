@@ -2,6 +2,8 @@
 
 Thanks for your interest in improving `abstractsemantics` — contributions are welcome.
 
+`abstractsemantics` is part of the wider AbstractFramework ecosystem (see `README.md`). The project aims to stay small, dependency-light, and easy to embed in downstream systems.
+
 ## Quickstart (local dev)
 
 Prerequisites:
@@ -28,6 +30,8 @@ python -m pip install -U build
 python -m build
 ```
 
+See `docs/development.md` for a concise development/release checklist.
+
 ## What to change
 
 Common contribution areas:
@@ -40,8 +44,8 @@ Common contribution areas:
 
 If you change docs or APIs:
 
-- Update `docs/` and `README.md`.
-- Update `CHANGELOD.md`.
+- Update `docs/` (start from `docs/README.md`) and `README.md`.
+- Update the changelog (`CHANGELOG.md`).
 - Regenerate `llms-full.txt`:
 
 ```bash
@@ -53,4 +57,3 @@ python scripts/generate_llms_full.py
 - Keep changes focused and small when possible.
 - Add/adjust tests for behavior changes.
 - Prefer concise, user-facing documentation (start from `docs/getting-started.md`).
-

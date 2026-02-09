@@ -29,7 +29,7 @@ Outputs are written to `dist/` (ignored by git via `.gitignore`).
 
 ## Regenerate `llms-full.txt`
 
-`llms-full.txt` is a generated “single file context” snapshot (see `scripts/generate_llms_full.py`).
+`llms-full.txt` is a generated “single file context” snapshot for agents. It is generated from `llms.txt` and embeds the contents of all **repository-local** links in that manifest (external links are not embedded). Do not edit `llms-full.txt` manually; edit `llms.txt` and rerun the generator.
 
 ```bash
 python scripts/generate_llms_full.py
@@ -37,7 +37,7 @@ python scripts/generate_llms_full.py
 
 ## Release checklist (docs-first)
 
-- Update `pyproject.toml` version (and `CHANGELOD.md`)
+- Update `pyproject.toml` version (and `CHANGELOG.md`)
 - Update `src/abstractsemantics/semantics.yaml` (registry changes)
 - Ensure docs reflect behavior (`docs/`)
 - Run `pytest`

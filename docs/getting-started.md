@@ -69,6 +69,12 @@ assert isinstance(resolved, dict)
 
 `resolve_schema_ref()` resolves the schema with default builder arguments. If you need non-default bounds or predicate aliases, call `build_kg_assertion_schema_v0(...)` directly.
 
+### AbstractFramework note
+
+In the AbstractFramework ecosystem, downstream systems (for example a runtime at the ingestion boundary) can store a compact schema reference like `{"$ref": "abstractsemantics:kg_assertion_schema_v0"}` and call `resolve_schema_ref()` to materialize the concrete JSON Schema dict.
+
+This package only provides the resolver and the builder (`src/abstractsemantics/schema.py`); it does not automatically wire this into any particular runtime.
+
 ## Use a custom registry file
 
 You can point the loader (and therefore the schema builder) at a custom YAML file.

@@ -9,6 +9,18 @@
 
 Start with [Getting started](getting-started.md).
 
+## How does this relate to AbstractFramework / AbstractCore / AbstractRuntime?
+
+This repo is intended to be a shared “definitions” component inside the AbstractFramework ecosystem:
+
+- AbstractFramework: https://github.com/lpalbou/AbstractFramework
+- AbstractCore: https://github.com/lpalbou/abstractcore
+- AbstractRuntime: https://github.com/lpalbou/abstractruntime
+
+`abstractsemantics` provides the allowed ids (predicates and entity types) and a small JSON Schema helper. Downstream systems (for example, at the ingestion boundary) can use those definitions to validate and normalize structured outputs.
+
+See [Architecture](architecture.md).
+
 ## Does this package store/query a knowledge graph?
 
 No. It only provides **definitions** (allowlists and prefixes) and helper utilities. Storage, indexing, and querying belong in downstream systems.
@@ -128,7 +140,7 @@ See [Development](development.md).
 
 ## How do I regenerate `llms-full.txt`?
 
-`llms-full.txt` is generated from the repo files list in `scripts/generate_llms_full.py`:
+`llms-full.txt` is generated from `llms.txt` by `scripts/generate_llms_full.py` (it embeds the contents of all repository-local links in the manifest; external links are not embedded):
 
 ```bash
 python scripts/generate_llms_full.py

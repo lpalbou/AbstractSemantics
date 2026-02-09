@@ -59,6 +59,46 @@ The returned object schema has the shape:
 
 - `{ "assertions": [ { subject, predicate, object, confidence?, valid_from?, ... , attributes: {...} } ] }`
 
+## Example outputs
+
+Empty (no high-confidence facts):
+
+```json
+{ "assertions": [] }
+```
+
+Non-empty (default schema requires at least 3 assertions when not empty):
+
+```json
+{
+  "assertions": [
+    {
+      "subject": "Alice",
+      "predicate": "schema:knowsAbout",
+      "object": "Linear algebra",
+      "confidence": 0.8,
+      "attributes": {
+        "subject_type": "schema:Person",
+        "object_type": "skos:Concept",
+        "evidence_quote": "Alice knows about linear algebra."
+      }
+    },
+    {
+      "subject": "Alice",
+      "predicate": "dcterms:creator",
+      "object": "Paper X",
+      "attributes": { "evidence_quote": "Alice wrote Paper X." }
+    },
+    {
+      "subject": "Paper X",
+      "predicate": "dcterms:title",
+      "object": "Paper X",
+      "attributes": { "evidence_quote": "The title is Paper X." }
+    }
+  ]
+}
+```
+
 See `src/abstractsemantics/schema.py` for the authoritative dict.
 
 ## Related docs

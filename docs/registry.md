@@ -76,6 +76,15 @@ print(sorted(reg.predicate_ids())[:5])
 print(sorted(reg.entity_type_ids())[:5])
 ```
 
+## Practical editing guidelines
+
+When updating `semantics.yaml`:
+
+- Prefer stable, explicit ids (typically CURIEs) and keep them consistent over time.
+- Add `label`/`description` for human-facing tooling (UIs, review, curation).
+- Use `inverse` (predicates) and `parent` (entity types) as navigational hints; the loader does not validate that references exist.
+- After changes, run `pytest` and (if applicable) regenerate `llms-full.txt` so agent manifests stay in sync.
+
 ## Related docs
 
 - [Getting started](getting-started.md)

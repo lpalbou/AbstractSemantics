@@ -21,4 +21,3 @@ All notable changes to this package are documented in this file.
 ## 0.0.1
 
 - Initial release of the semantics registry loader and KG assertion JSON Schema helpers.
-

@@ -2,6 +2,15 @@
 
 Thanks for helping keep `abstractsemantics` and its users safe.
 
+## Scope
+
+This policy covers vulnerabilities in:
+
+- the Python package code under `src/abstractsemantics/`
+- the packaged default registry file `src/abstractsemantics/semantics.yaml`
+
+Downstream systems that *consume* this package (runtimes, UIs, ingestion pipelines) should follow their own security policies as well.
+
 ## Reporting a vulnerability
 
 Please report security issues **privately** and responsibly:
@@ -17,7 +26,10 @@ Please report security issues **privately** and responsibly:
 - Affected versions/commits if known
 - Any suggested fix or mitigation (optional)
 
+## Response expectations
+
+We’ll acknowledge a report as soon as possible and work with you on a fix and coordinated disclosure when appropriate.
+
 ## Supported versions
 
 Security fixes are provided for the latest released version in the `0.x` series.
-

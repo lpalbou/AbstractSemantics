@@ -5,11 +5,11 @@ This project is made possible by the Python ecosystem and a small set of excelle
 ## Libraries and tools
 
 - **Python**: language and standard library used throughout (`dataclasses`, `pathlib`, `typing`, …).
-- **PyYAML**: YAML parsing used to load the semantics registry (`src/abstractsemantics/registry.py`).
-- **pytest**: test runner for the package (`tests/`).
-- **setuptools** + **wheel**: packaging/build backend and wheel support (`pyproject.toml`).
+- **PyYAML**: runtime dependency used to load the semantics registry (`src/abstractsemantics/registry.py`; declared in `pyproject.toml`).
+- **pytest**: test runner used by the optional `dev` extra (`tests/`; declared in `pyproject.toml`).
+- **setuptools** + **wheel**: build backend and wheel support (`pyproject.toml`).
 - **build**: PEP 517 build frontend used to produce sdists/wheels (`python -m build`; see `docs/development.md`).
-- **Mermaid**: diagram syntax used in `docs/architecture.md` (rendering depends on the viewer).
+- **Mermaid**: diagram syntax used in docs (for example `docs/architecture.md`; rendering depends on the viewer).
 
 ## Standards and vocabularies
 
