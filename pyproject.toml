@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractsemantics"
-version = "0.0.2"
+version = "0.0.3"
 description = "Semantics registry (predicates/types) for AbstractFramework."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+apple = []
+all-apple = []
+gpu = []
+all-gpu = []
 dev = ["pytest>=7.0.0"]
 
 [tool.setuptools.packages.find]

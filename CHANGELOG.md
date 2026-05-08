@@ -2,6 +2,20 @@
 
 All notable changes to this package are documented in this file.
 
+## 0.0.3 - 2026-05-08
+
+### Added
+
+- Added install-profile compatibility extras:
+  `abstractsemantics[apple]`, `abstractsemantics[gpu]`,
+  `abstractsemantics[all-apple]`, and `abstractsemantics[all-gpu]`.
+
+### Notes
+
+- These extras are intentionally no-op aliases. Semantics has no hardware
+  runtime dependencies, but exposing the shared profile names keeps
+  higher-level aggregate installs composable.
+
 ## 0.0.2 - 2026-02-04
 
 ### Added

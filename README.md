@@ -42,6 +42,12 @@ pip install -e ".[dev]"
 
 Requires Python `>=3.10` (see `pyproject.toml`).
 
+For framework-wide dependency manifests, the no-op compatibility extras
+`abstractsemantics[apple]`, `abstractsemantics[gpu]`,
+`abstractsemantics[all-apple]`, and `abstractsemantics[all-gpu]` are available.
+They do not add dependencies because this package owns semantics definitions,
+not hardware runtimes.
+
 ## Quickstart
 
 Load the default registry and build the v0 structured-output schema:
