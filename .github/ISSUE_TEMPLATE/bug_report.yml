@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible AbstractSemantics bug
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Include enough detail to reproduce the registry, schema, or packaging behavior.
+  - type: input
+    id: version
+    attributes:
+      label: AbstractSemantics version
+      description: Output of `python -c "from importlib.metadata import version; print(version('abstractsemantics'))"`
+      placeholder: "0.0.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - registry
+        - schema
+        - semantics yaml
+        - packaging/install
+        - documentation
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behavior, including exact errors or unexpected registry/schema output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include commands, Python snippets, registry inputs, and schema references.
+      placeholder: |
+        1. Load registry with ...
+        2. Build schema with ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, installed extras, and relevant package versions.
+      placeholder: |
+        macOS 15, Python 3.12
+        pip install "abstractsemantics[apple]"
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Logs or artifacts
+      description: Attach logs, registry snippets, schema output, or related files.
+    validations:
+      required: false

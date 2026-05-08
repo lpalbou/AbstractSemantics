@@ -2,6 +2,18 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.0.4] - 2026-05-08
+
+### Added
+
+- Added GitHub Actions CI for Python 3.10 through 3.12 with pytest and package
+  build checks.
+- Added a trusted-publishing release workflow for tagged or manually dispatched
+  releases, including version/changelog validation, distribution artifacts,
+  PyPI publication, and GitHub Release creation.
+- Added an AbstractSemantics GitHub bug report template.
+- Added a `test` optional dependency extra for CI and release validation.
+
 ## 0.0.3 - 2026-05-08
 
 ### Added
