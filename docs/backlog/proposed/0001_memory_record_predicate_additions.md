@@ -90,3 +90,31 @@ the registry batch should land before or with them.
 Cross-check AbstractMemory's items 0016/0021 for the exact final list before
 implementing — the record-layer design may have evolved. Keep the "no invented
 vocabulary" rule absolute.
+
+## Addendum 2026-07-10 — verified drift against the shipped engine
+
+Verified against abstractmemory `entity-work` @ 15544f5 (the engine that now
+runs live entity homes):
+
+1. **No dependency yet**: abstractmemory has zero references to
+   abstractsemantics (no import, no pyproject dependency). The hard-dep
+   decision (2026-07-05) is not yet reflected in code; vocabulary validation
+   (memory item 0016) remains proposed/deferred —
+   `records.py` marks relation predicates "NOT vocabulary-validated in v1
+   (0016)" explicitly.
+2. **The shipped vocabulary differs from this proposal's mapping**: the only
+   CURIE in live use is `dcterms:abstract` (record digests). Relation edges
+   use plain words: `summarizes`, `mentions`, `written_amid`, `from_session`,
+   `reflected_in`, `continues`, `derived_from` (records/consolidation/
+   maintenance modules). The original five-CURIE list above is therefore
+   stale as a build list.
+3. **Append-only constraint on any future validation**: live homes (Castor's)
+   already carry engraved edges with the plain-word predicates, and journals
+   are append-only — those strings can never be rewritten. When 0016
+   promotes, the registry must either admit the shipped plain-word relations
+   (as declared terms or aliases of registry CURIEs), or validation applies
+   to new writes only. Registry-side declared synonyms are the likely honest
+   shape; decide jointly with AbstractMemory.
+
+Ask filed with the memory seat on agora (commons, 2026-07-10) to settle the
+final list before promotion.
