@@ -17,6 +17,7 @@ If `ABSTRACTSEMANTICS_REGISTRY_PATH` is set and points to a non-existent file, `
 - `prefixes`: mapping `prefix -> namespace_iri` (strings only)
 - `predicates`: list of predicate definitions (must contain at least 1 valid entry)
 - `entity_types`: list of entity-type definitions (may be empty, but some workflows require it)
+- `memory_relations`: list of memory-record edge relations (plain-word ids; see below)
 
 Unknown keys are ignored.
 
@@ -51,6 +52,48 @@ Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance wit
 - `description` (optional): string
 
 Invalid items are skipped. The registry loader does not currently require entity types to be present; however, `build_kg_assertion_schema_v0()` raises `ValueError` if the provided registry has no entity types.
+
+## Memory-relation definitions
+
+Each item under `memory_relations` becomes a `MemoryRelationDef` dataclass instance with:
+
+- `id` (required): a **plain word** (e.g. `summarizes`, `written_amid`) — deliberately NOT a CURIE
+- `label` (optional): string
+- `description` (optional): string
+- `equivalent` (optional): list of standard-ontology CURIEs (equal-or-broader terms) carried as export/interop metadata only
+
+This vocabulary is the declared edge-relation set for AbstractMemory's typed
+memory records (decision `0016-vocabulary-direction`, 2026-07-10). Design
+rules, in force:
+
+- **Plain words are the canonical at-rest spelling.** Memory journals are
+  append-only and equality-key predicate strings with no alias resolution at
+  read, so an engraved word can never be renamed. `equivalent` CURIEs are
+  hints for export/interop — never a second at-rest spelling.
+- **Equivalents are many-to-one and lossy.** Several plain words may share
+  one broader CURIE (`summarizes`/`from_session`/`derived_from` all
+  specialize `prov:wasDerivedFrom`); the mapping is never reversible and
+  must never drive an import back to plain words (memory fidelity review,
+  2026-07-10).
+- **Disjoint from `predicates`.** The `predicates` list feeds the
+  KG-extraction structured-output enum; memory relations must never appear
+  there (test-pinned).
+- **Append-widen only, coordinated.** No new relation is engraved by
+  AbstractMemory before it is declared here, and nothing is added here
+  without coordinating with the memory seat. Ids are never renamed or
+  removed.
+- **Validation set.** `SemanticsRegistry.memory_record_predicate_ids()`
+  returns the declared relation ids plus the digest predicate
+  (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`) — the set AbstractMemory's
+  vocabulary validation checks NEW record writes against.
+- **Authority boundary (settled with the memory seat, 2026-07-10).** The
+  registry owns AT-REST PREDICATE vocabulary (this section, per the 0016
+  ruling). Engine validation vocabularies — AbstractMemory's record-kind set
+  and `diary_type` closed set — stay engine-owned and are package-root
+  exports of `abstractmemory` (`MEMORY_RECORD_KINDS`, `DIARY_TYPES`,
+  `KIND_RANKS`): consumers import the owning set rather than copying it. A
+  registry declaration of those sets would create a second authority that
+  could disagree with the refusing code — the drift class one level up.
 
 ## Minimal example
 

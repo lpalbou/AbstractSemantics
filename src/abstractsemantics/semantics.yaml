@@ -1,4 +1,4 @@
-version: 0
+version: 1
 
 prefixes:
   dcterms: "http://purl.org/dc/terms/"
@@ -6,6 +6,7 @@ prefixes:
   skos: "http://www.w3.org/2004/02/skos/core#"
   cito: "http://purl.org/spar/cito/"
   rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  prov: "http://www.w3.org/ns/prov#"
   ex: "http://example.org/"
 
 # v0 policy: predicate allowlist for ingestion validation + UI dropdowns.
@@ -120,6 +121,64 @@ predicates:
     label: "discusses"
   - id: "cito:confirms"
     label: "confirms"
+
+# Memory-record edge vocabulary (AbstractMemory typed records).
+#
+# Declared per decision:0016-vocabulary-direction (2026-07-10, agora commons
+# store; semantics c173 -> memory c184 -> resolved c190): the engine's
+# append-only journals engrave predicate strings permanently and equality-key
+# them with no alias resolution at read, so the PLAIN WORDS below are the
+# canonical at-rest spelling — one spelling per predicate, forever. CURIE
+# forms ride `equivalent:` as interop/export metadata ONLY, never a second
+# at-rest spelling.
+#
+# This section is deliberately SEPARATE from `predicates:` — that list feeds
+# the KG-extraction structured-output enum (build_kg_assertion_schema_v0),
+# and memory-record edges must never appear there (two spellings of one
+# predicate in front of an extractor is the confusion the ruling forbids).
+# The digest predicate for memory records is `dcterms:abstract` (declared in
+# `predicates:` above); AbstractMemory's validation set = these ids plus it.
+#
+# Direction convention: subject = the authored/newer record, object = the
+# target record it points at (confirmed against every shipped writer,
+# memory review 2026-07-10).
+#
+# `equivalent` lists are MANY-TO-ONE and LOSSY interop hints: several plain
+# words may share one broader CURIE (summarizes/from_session/derived_from
+# all specialize prov:wasDerivedFrom) — the mapping is never reversible and
+# must never drive an import back to plain words.
+#
+# Widening rule (both ways, e-s 143/145): no new relation engraves before a
+# declaration lands here, coordinated with the memory seat; nothing is added
+# here without coordinating with memory.
+memory_relations:
+  - id: "summarizes"
+    label: "summarizes"
+    description: "A summary/reflection record names a source record it condenses (a summary must name its sources)."
+    equivalent: ["prov:wasDerivedFrom"]
+  - id: "mentions"
+    label: "mentions"
+    description: "Weak associative link from a record to one it references without deriving from it (e.g. dream records naming their source islands)."
+    equivalent: ["schema:mentions"]
+  - id: "written_amid"
+    label: "written amid"
+    description: "Act-frame co-presence: a diary projection points at the graph records attended at write time. No exact standard-ontology equivalent (broadest near term: prov:wasInfluencedBy); deliberately unmapped."
+  - id: "from_session"
+    label: "from session"
+    description: "An elected identity record (e.g. an interest) points at the session record it grew out of."
+    equivalent: ["prov:wasDerivedFrom"]
+  - id: "reflected_in"
+    label: "reflected in"
+    description: "An exchange/episode points at a diary entry elected during it (the exchange is the subject the entry reflects on). Only non-private projections carry this edge — private diary projections carry no edges by the containment rule."
+    equivalent: ["schema:subjectOf"]
+  - id: "continues"
+    label: "continues"
+    description: "An episode points at the immediately preceding episode in its session chain."
+    equivalent: ["schema:previousItem"]
+  - id: "derived_from"
+    label: "derived from"
+    description: "General derivation: a record points at the source material it was derived from."
+    equivalent: ["prov:wasDerivedFrom"]
 
 entity_types:
   # Generic "real-world thing" catch-all (includes physical objects).

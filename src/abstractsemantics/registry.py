@@ -7,6 +7,12 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import yaml
 
+# The digest predicate for memory records: every formed record asserts its
+# digest text under this predicate (the one CURIE at rest in memory journals;
+# decision:0016-vocabulary-direction). Part of the memory-record validation
+# set alongside the declared plain-word relations.
+MEMORY_DIGEST_PREDICATE = "dcterms:abstract"
+
 
 @dataclass(frozen=True)
 class PredicateDef:
@@ -25,17 +31,49 @@ class EntityTypeDef:
 
 
 @dataclass(frozen=True)
+class MemoryRelationDef:
+    """A memory-record edge relation (AbstractMemory typed records).
+
+    Deliberately a separate vocabulary from `PredicateDef`: memory-record
+    relations are engraved as PLAIN WORDS in append-only journals (the
+    canonical at-rest spelling, never renamed), while `predicates` feed the
+    KG-extraction structured-output enum. `equivalent` carries equal-or-
+    broader standard CURIEs as export/interop metadata only — never a second
+    at-rest spelling (decision:0016-vocabulary-direction, 2026-07-10).
+    """
+
+    id: str
+    label: Optional[str] = None
+    description: Optional[str] = None
+    equivalent: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SemanticsRegistry:
     version: int
     prefixes: Dict[str, str]
     predicates: List[PredicateDef]
     entity_types: List[EntityTypeDef]
+    memory_relations: List[MemoryRelationDef]
 
     def predicate_ids(self) -> set[str]:
         return {p.id for p in self.predicates if isinstance(p.id, str) and p.id.strip()}
 
     def entity_type_ids(self) -> set[str]:
         return {t.id for t in self.entity_types if isinstance(t.id, str) and t.id.strip()}
+
+    def memory_relation_ids(self) -> set[str]:
+        return {r.id for r in self.memory_relations if isinstance(r.id, str) and r.id.strip()}
+
+    def memory_record_predicate_ids(self) -> set[str]:
+        """The full validation set for memory-record writes.
+
+        Declared plain-word relation ids plus the digest predicate — the set
+        AbstractMemory's vocabulary validation (its item 0016) checks NEW
+        writes against. Engraved history predates validation and is never
+        re-checked (append-only journals).
+        """
+        return self.memory_relation_ids() | {MEMORY_DIGEST_PREDICATE}
 
 
 def resolve_semantics_registry_path() -> Path:
@@ -112,6 +150,28 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
             )
         )
 
+    memory_relations: list[MemoryRelationDef] = []
+    for item in _as_list(data.get("memory_relations")):
+        if not isinstance(item, dict):
+            continue
+        rid = item.get("id")
+        if not isinstance(rid, str) or not rid.strip():
+            continue
+        equivalent_raw = item.get("equivalent")
+        equivalent = tuple(
+            e.strip()
+            for e in (equivalent_raw if isinstance(equivalent_raw, list) else [])
+            if isinstance(e, str) and e.strip()
+        )
+        memory_relations.append(
+            MemoryRelationDef(
+                id=rid.strip(),
+                label=item.get("label") if isinstance(item.get("label"), str) else None,
+                description=item.get("description") if isinstance(item.get("description"), str) else None,
+                equivalent=equivalent,
+            )
+        )
+
     if not predicates:
         raise ValueError(f"Semantics registry has no predicates: {p}")
 
@@ -120,6 +180,7 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
         prefixes=prefixes,
         predicates=predicates,
         entity_types=entity_types,
+        memory_relations=memory_relations,
     )
 
 

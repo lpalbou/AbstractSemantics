@@ -24,7 +24,7 @@ Included files, in order:
 - `CHANGELOG.md`
 - `CONTRIBUTING.md`
 - `SECURITY.md`
-- `ACKNOWLEDMENTS.md`
+- `ACKNOWLEDGMENTS.md`
 - `LICENSE`
 - `docs/guide/semantics/semantic-triple-prompt-v4-optimized.md`
 - `scripts/generate_llms_full.py`
@@ -85,7 +85,7 @@ Key behavior notes (source of truth: `src/abstractsemantics/`):
 - [Changelog](CHANGELOG.md): release notes
 - [Contributing](CONTRIBUTING.md): development and PR guidelines
 - [Security policy](SECURITY.md): responsible vulnerability reporting
-- [Acknowledgments](ACKNOWLEDMENTS.md): credits and upstream projects/standards
+- [Acknowledgments](ACKNOWLEDGMENTS.md): credits and upstream projects/standards
 - [License](LICENSE): license terms
 
 ## Ecosystem (external)
@@ -148,6 +148,12 @@ pip install -e ".[dev]"
 ```
 
 Requires Python `>=3.10` (see `pyproject.toml`).
+
+For framework-wide dependency manifests, the no-op compatibility extras
+`abstractsemantics[apple]`, `abstractsemantics[gpu]`,
+`abstractsemantics[all-apple]`, and `abstractsemantics[all-gpu]` are available.
+They do not add dependencies because this package owns semantics definitions,
+not hardware runtimes.
 
 ## Quickstart
 
@@ -489,6 +495,7 @@ If `ABSTRACTSEMANTICS_REGISTRY_PATH` is set and points to a non-existent file, `
 - `prefixes`: mapping `prefix -> namespace_iri` (strings only)
 - `predicates`: list of predicate definitions (must contain at least 1 valid entry)
 - `entity_types`: list of entity-type definitions (may be empty, but some workflows require it)
+- `memory_relations`: list of memory-record edge relations (plain-word ids; see below)
 
 Unknown keys are ignored.
 
@@ -523,6 +530,48 @@ Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance wit
 - `description` (optional): string
 
 Invalid items are skipped. The registry loader does not currently require entity types to be present; however, `build_kg_assertion_schema_v0()` raises `ValueError` if the provided registry has no entity types.
+
+## Memory-relation definitions
+
+Each item under `memory_relations` becomes a `MemoryRelationDef` dataclass instance with:
+
+- `id` (required): a **plain word** (e.g. `summarizes`, `written_amid`) — deliberately NOT a CURIE
+- `label` (optional): string
+- `description` (optional): string
+- `equivalent` (optional): list of standard-ontology CURIEs (equal-or-broader terms) carried as export/interop metadata only
+
+This vocabulary is the declared edge-relation set for AbstractMemory's typed
+memory records (decision `0016-vocabulary-direction`, 2026-07-10). Design
+rules, in force:
+
+- **Plain words are the canonical at-rest spelling.** Memory journals are
+  append-only and equality-key predicate strings with no alias resolution at
+  read, so an engraved word can never be renamed. `equivalent` CURIEs are
+  hints for export/interop — never a second at-rest spelling.
+- **Equivalents are many-to-one and lossy.** Several plain words may share
+  one broader CURIE (`summarizes`/`from_session`/`derived_from` all
+  specialize `prov:wasDerivedFrom`); the mapping is never reversible and
+  must never drive an import back to plain words (memory fidelity review,
+  2026-07-10).
+- **Disjoint from `predicates`.** The `predicates` list feeds the
+  KG-extraction structured-output enum; memory relations must never appear
+  there (test-pinned).
+- **Append-widen only, coordinated.** No new relation is engraved by
+  AbstractMemory before it is declared here, and nothing is added here
+  without coordinating with the memory seat. Ids are never renamed or
+  removed.
+- **Validation set.** `SemanticsRegistry.memory_record_predicate_ids()`
+  returns the declared relation ids plus the digest predicate
+  (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`) — the set AbstractMemory's
+  vocabulary validation checks NEW record writes against.
+- **Authority boundary (settled with the memory seat, 2026-07-10).** The
+  registry owns AT-REST PREDICATE vocabulary (this section, per the 0016
+  ruling). Engine validation vocabularies — AbstractMemory's record-kind set
+  and `diary_type` closed set — stay engine-owned and are package-root
+  exports of `abstractmemory` (`MEMORY_RECORD_KINDS`, `DIARY_TYPES`,
+  `KIND_RANKS`): consumers import the owning set rather than copying it. A
+  registry declaration of those sets would create a second authority that
+  could disagree with the refusing code — the drift class one level up.
 
 ## Minimal example
 
@@ -847,9 +896,12 @@ Please follow the responsible disclosure guidance in [`SECURITY.md`](../SECURITY
 
 ## Registry
 
-- `SemanticsRegistry`: frozen dataclass with fields `version`, `prefixes`, `predicates`, `entity_types`
+- `SemanticsRegistry`: frozen dataclass with fields `version`, `prefixes`, `predicates`, `entity_types`, `memory_relations`
   - `predicate_ids() -> set[str]`
   - `entity_type_ids() -> set[str]`
+  - `memory_relation_ids() -> set[str]`
+  - `memory_record_predicate_ids() -> set[str]` — declared memory relations plus `MEMORY_DIGEST_PREDICATE`; the validation set for AbstractMemory record writes
+- `MEMORY_DIGEST_PREDICATE: str` — `"dcterms:abstract"`, the digest predicate for memory records
 - `resolve_semantics_registry_path() -> pathlib.Path`
   - default: `abstractsemantics/semantics.yaml` (in this repo: `src/abstractsemantics/semantics.yaml`)
   - override: `ABSTRACTSEMANTICS_REGISTRY_PATH`
@@ -857,12 +909,13 @@ Please follow the responsible disclosure guidance in [`SECURITY.md`](../SECURITY
 
 ### Registry entry shapes (returned objects)
 
-While only `SemanticsRegistry` is re-exported at top-level, the registry loader returns immutable dataclass instances for entries too (defined in `src/abstractsemantics/registry.py`):
+While `SemanticsRegistry` and `MemoryRelationDef` are re-exported at top-level, the registry loader returns immutable dataclass instances for the other entries too (defined in `src/abstractsemantics/registry.py`):
 
 - `PredicateDef`: `id`, `label?`, `inverse?`, `description?`
 - `EntityTypeDef`: `id`, `label?`, `parent?`, `description?`
+- `MemoryRelationDef`: `id` (plain word), `label?`, `description?`, `equivalent` (tuple of standard CURIEs, interop metadata only)
 
-These entry classes are not part of the explicitly re-exported top-level API. For compatibility, prefer treating them as simple records and rely on the documented fields (especially `id`).
+`PredicateDef`/`EntityTypeDef` are not part of the explicitly re-exported top-level API. For compatibility, prefer treating them as simple records and rely on the documented fields (especially `id`).
 
 You can treat these as simple, frozen objects with attributes:
 
@@ -960,7 +1013,7 @@ python scripts/generate_llms_full.py
 ## src/abstractsemantics/semantics.yaml
 
 ```yaml
-version: 0
+version: 1
 
 prefixes:
   dcterms: "http://purl.org/dc/terms/"
@@ -968,6 +1021,7 @@ prefixes:
   skos: "http://www.w3.org/2004/02/skos/core#"
   cito: "http://purl.org/spar/cito/"
   rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  prov: "http://www.w3.org/ns/prov#"
   ex: "http://example.org/"
 
 # v0 policy: predicate allowlist for ingestion validation + UI dropdowns.
@@ -1083,6 +1137,64 @@ predicates:
   - id: "cito:confirms"
     label: "confirms"
 
+# Memory-record edge vocabulary (AbstractMemory typed records).
+#
+# Declared per decision:0016-vocabulary-direction (2026-07-10, agora commons
+# store; semantics c173 -> memory c184 -> resolved c190): the engine's
+# append-only journals engrave predicate strings permanently and equality-key
+# them with no alias resolution at read, so the PLAIN WORDS below are the
+# canonical at-rest spelling — one spelling per predicate, forever. CURIE
+# forms ride `equivalent:` as interop/export metadata ONLY, never a second
+# at-rest spelling.
+#
+# This section is deliberately SEPARATE from `predicates:` — that list feeds
+# the KG-extraction structured-output enum (build_kg_assertion_schema_v0),
+# and memory-record edges must never appear there (two spellings of one
+# predicate in front of an extractor is the confusion the ruling forbids).
+# The digest predicate for memory records is `dcterms:abstract` (declared in
+# `predicates:` above); AbstractMemory's validation set = these ids plus it.
+#
+# Direction convention: subject = the authored/newer record, object = the
+# target record it points at (confirmed against every shipped writer,
+# memory review 2026-07-10).
+#
+# `equivalent` lists are MANY-TO-ONE and LOSSY interop hints: several plain
+# words may share one broader CURIE (summarizes/from_session/derived_from
+# all specialize prov:wasDerivedFrom) — the mapping is never reversible and
+# must never drive an import back to plain words.
+#
+# Widening rule (both ways, e-s 143/145): no new relation engraves before a
+# declaration lands here, coordinated with the memory seat; nothing is added
+# here without coordinating with memory.
+memory_relations:
+  - id: "summarizes"
+    label: "summarizes"
+    description: "A summary/reflection record names a source record it condenses (a summary must name its sources)."
+    equivalent: ["prov:wasDerivedFrom"]
+  - id: "mentions"
+    label: "mentions"
+    description: "Weak associative link from a record to one it references without deriving from it (e.g. dream records naming their source islands)."
+    equivalent: ["schema:mentions"]
+  - id: "written_amid"
+    label: "written amid"
+    description: "Act-frame co-presence: a diary projection points at the graph records attended at write time. No exact standard-ontology equivalent (broadest near term: prov:wasInfluencedBy); deliberately unmapped."
+  - id: "from_session"
+    label: "from session"
+    description: "An elected identity record (e.g. an interest) points at the session record it grew out of."
+    equivalent: ["prov:wasDerivedFrom"]
+  - id: "reflected_in"
+    label: "reflected in"
+    description: "An exchange/episode points at a diary entry elected during it (the exchange is the subject the entry reflects on). Only non-private projections carry this edge — private diary projections carry no edges by the containment rule."
+    equivalent: ["schema:subjectOf"]
+  - id: "continues"
+    label: "continues"
+    description: "An episode points at the immediately preceding episode in its session chain."
+    equivalent: ["schema:previousItem"]
+  - id: "derived_from"
+    label: "derived from"
+    description: "General derivation: a record points at the source material it was derived from."
+    equivalent: ["prov:wasDerivedFrom"]
+
 entity_types:
   # Generic "real-world thing" catch-all (includes physical objects).
   - id: "schema:Thing"
@@ -1131,6 +1243,8 @@ entity_types:
 
 ```python
 from .registry import (
+    MEMORY_DIGEST_PREDICATE,
+    MemoryRelationDef,
     SemanticsRegistry,
     load_semantics_registry,
     resolve_semantics_registry_path,
@@ -1142,6 +1256,8 @@ from .schema import (
 )
 
 __all__ = [
+    "MEMORY_DIGEST_PREDICATE",
+    "MemoryRelationDef",
     "SemanticsRegistry",
     "load_semantics_registry",
     "resolve_semantics_registry_path",
@@ -1164,6 +1280,12 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import yaml
 
+# The digest predicate for memory records: every formed record asserts its
+# digest text under this predicate (the one CURIE at rest in memory journals;
+# decision:0016-vocabulary-direction). Part of the memory-record validation
+# set alongside the declared plain-word relations.
+MEMORY_DIGEST_PREDICATE = "dcterms:abstract"
+
 
 @dataclass(frozen=True)
 class PredicateDef:
@@ -1182,17 +1304,49 @@ class EntityTypeDef:
 
 
 @dataclass(frozen=True)
+class MemoryRelationDef:
+    """A memory-record edge relation (AbstractMemory typed records).
+
+    Deliberately a separate vocabulary from `PredicateDef`: memory-record
+    relations are engraved as PLAIN WORDS in append-only journals (the
+    canonical at-rest spelling, never renamed), while `predicates` feed the
+    KG-extraction structured-output enum. `equivalent` carries equal-or-
+    broader standard CURIEs as export/interop metadata only — never a second
+    at-rest spelling (decision:0016-vocabulary-direction, 2026-07-10).
+    """
+
+    id: str
+    label: Optional[str] = None
+    description: Optional[str] = None
+    equivalent: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SemanticsRegistry:
     version: int
     prefixes: Dict[str, str]
     predicates: List[PredicateDef]
     entity_types: List[EntityTypeDef]
+    memory_relations: List[MemoryRelationDef]
 
     def predicate_ids(self) -> set[str]:
         return {p.id for p in self.predicates if isinstance(p.id, str) and p.id.strip()}
 
     def entity_type_ids(self) -> set[str]:
         return {t.id for t in self.entity_types if isinstance(t.id, str) and t.id.strip()}
+
+    def memory_relation_ids(self) -> set[str]:
+        return {r.id for r in self.memory_relations if isinstance(r.id, str) and r.id.strip()}
+
+    def memory_record_predicate_ids(self) -> set[str]:
+        """The full validation set for memory-record writes.
+
+        Declared plain-word relation ids plus the digest predicate — the set
+        AbstractMemory's vocabulary validation (its item 0016) checks NEW
+        writes against. Engraved history predates validation and is never
+        re-checked (append-only journals).
+        """
+        return self.memory_relation_ids() | {MEMORY_DIGEST_PREDICATE}
 
 
 def resolve_semantics_registry_path() -> Path:
@@ -1269,6 +1423,28 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
             )
         )
 
+    memory_relations: list[MemoryRelationDef] = []
+    for item in _as_list(data.get("memory_relations")):
+        if not isinstance(item, dict):
+            continue
+        rid = item.get("id")
+        if not isinstance(rid, str) or not rid.strip():
+            continue
+        equivalent_raw = item.get("equivalent")
+        equivalent = tuple(
+            e.strip()
+            for e in (equivalent_raw if isinstance(equivalent_raw, list) else [])
+            if isinstance(e, str) and e.strip()
+        )
+        memory_relations.append(
+            MemoryRelationDef(
+                id=rid.strip(),
+                label=item.get("label") if isinstance(item.get("label"), str) else None,
+                description=item.get("description") if isinstance(item.get("description"), str) else None,
+                equivalent=equivalent,
+            )
+        )
+
     if not predicates:
         raise ValueError(f"Semantics registry has no predicates: {p}")
 
@@ -1277,6 +1453,7 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
         prefixes=prefixes,
         predicates=predicates,
         entity_types=entity_types,
+        memory_relations=memory_relations,
     )
 ```
 ---
@@ -1432,7 +1609,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractsemantics"
-version = "0.0.2"
+version = "0.0.5"
 description = "Semantics registry (predicates/types) for AbstractFramework."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -1444,7 +1621,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+apple = []
+all-apple = []
+gpu = []
+all-gpu = []
 dev = ["pytest>=7.0.0"]
+test = ["pytest>=7.0.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -1461,7 +1643,24 @@ abstractsemantics = ["*.yaml", "*.yml"]
 ```python
 from __future__ import annotations
 
-from abstractsemantics import load_semantics_registry
+from abstractsemantics import (
+    MEMORY_DIGEST_PREDICATE,
+    load_semantics_registry,
+)
+
+# The seven plain-word memory-record relations declared per
+# decision:0016-vocabulary-direction (2026-07-10). Engraved append-only —
+# this set may WIDEN (coordinated with the memory seat) but an id must never
+# be renamed or removed.
+DECLARED_MEMORY_RELATIONS = {
+    "summarizes",
+    "mentions",
+    "written_amid",
+    "from_session",
+    "reflected_in",
+    "continues",
+    "derived_from",
+}
 
 
 def test_load_semantics_registry_has_predicates():
@@ -1469,6 +1668,44 @@ def test_load_semantics_registry_has_predicates():
     ids = reg.predicate_ids()
     assert "rdf:type" in ids
     assert "dcterms:isPartOf" in ids
+
+
+def test_memory_relations_declared_plain_words():
+    reg = load_semantics_registry()
+    ids = reg.memory_relation_ids()
+    assert DECLARED_MEMORY_RELATIONS <= ids
+    # Plain words are the canonical at-rest spelling: no prefixed/CURIE ids
+    # may ever appear in this vocabulary (one spelling per predicate).
+    assert all(":" not in rid for rid in ids)
+
+
+def test_memory_record_predicate_ids_is_relations_plus_digest():
+    reg = load_semantics_registry()
+    validation_set = reg.memory_record_predicate_ids()
+    assert validation_set == reg.memory_relation_ids() | {MEMORY_DIGEST_PREDICATE}
+    assert MEMORY_DIGEST_PREDICATE == "dcterms:abstract"
+
+
+def test_memory_relation_equivalents_are_prefixed_registry_style():
+    """Equivalence metadata carries standard CURIEs only (interop hints), and
+    every CURIE prefix must be declared in the registry prefixes map — the
+    no-invented-vocabulary rule made checkable."""
+    reg = load_semantics_registry()
+    for rel in reg.memory_relations:
+        for eq in rel.equivalent:
+            assert ":" in eq, f"{rel.id}: equivalent {eq!r} is not a CURIE"
+            prefix = eq.split(":", 1)[0]
+            assert prefix in reg.prefixes, (
+                f"{rel.id}: equivalent {eq!r} uses undeclared prefix {prefix!r}"
+            )
+
+
+def test_memory_relations_never_leak_into_kg_predicates():
+    """The KG-extraction predicate list and the memory-relation vocabulary are
+    disjoint by design: memory plain words must never surface in the
+    structured-output enum fed to extractors."""
+    reg = load_semantics_registry()
+    assert not (reg.predicate_ids() & reg.memory_relation_ids())
 ```
 ---
 
@@ -1521,6 +1758,59 @@ def test_resolve_schema_ref_returns_concrete_schema() -> None:
 # Changelog
 
 All notable changes to this package are documented in this file.
+
+## [0.0.5] - 2026-07-10
+
+### Added
+
+- Declared the AbstractMemory typed-record edge vocabulary as a new
+  `memory_relations` registry section (`summarizes`, `mentions`,
+  `written_amid`, `from_session`, `reflected_in`, `continues`,
+  `derived_from`) per decision `0016-vocabulary-direction` (2026-07-10):
+  plain words are the canonical at-rest spelling; standard-ontology CURIEs
+  ride each entry's `equivalent` list as export/interop metadata only.
+- New `MemoryRelationDef` dataclass, `SemanticsRegistry.memory_relation_ids()`,
+  `SemanticsRegistry.memory_record_predicate_ids()` (the AbstractMemory
+  validation set: declared relations + digest predicate), and the
+  `MEMORY_DIGEST_PREDICATE` constant (`"dcterms:abstract"`).
+- Declared the `prov` prefix (PROV-O) for equivalence metadata.
+- Registry `version` bumped to 1.
+
+### Notes
+
+- `memory_relations` is deliberately disjoint from `predicates` (test-pinned):
+  the `predicates` list feeds the KG-extraction structured-output enum, and
+  memory plain words must never surface there.
+- Widening rule (both directions, on record with the memory seat): no new
+  relation engraves in AbstractMemory before it is declared here; nothing is
+  added here without coordinating with the memory seat. Ids are never renamed
+  or removed (append-only journals engrave them permanently).
+
+## [0.0.4] - 2026-05-08
+
+### Added
+
+- Added GitHub Actions CI for Python 3.10 through 3.12 with pytest and package
+  build checks.
+- Added a trusted-publishing release workflow for tagged or manually dispatched
+  releases, including version/changelog validation, distribution artifacts,
+  PyPI publication, and GitHub Release creation.
+- Added an AbstractSemantics GitHub bug report template.
+- Added a `test` optional dependency extra for CI and release validation.
+
+## 0.0.3 - 2026-05-08
+
+### Added
+
+- Added install-profile compatibility extras:
+  `abstractsemantics[apple]`, `abstractsemantics[gpu]`,
+  `abstractsemantics[all-apple]`, and `abstractsemantics[all-gpu]`.
+
+### Notes
+
+- These extras are intentionally no-op aliases. Semantics has no hardware
+  runtime dependencies, but exposing the shared profile names keeps
+  higher-level aggregate installs composable.
 
 ## 0.0.2 - 2026-02-04
 
@@ -1648,7 +1938,7 @@ Security fixes are provided for the latest released version in the `0.x` series.
 
 ---
 
-## ACKNOWLEDMENTS.md
+## ACKNOWLEDGMENTS.md
 
 # Acknowledgments
 

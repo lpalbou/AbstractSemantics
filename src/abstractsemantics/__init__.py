@@ -1,4 +1,6 @@
 from .registry import (
+    MEMORY_DIGEST_PREDICATE,
+    MemoryRelationDef,
     SemanticsRegistry,
     load_semantics_registry,
     resolve_semantics_registry_path,
@@ -10,6 +12,8 @@ from .schema import (
 )
 
 __all__ = [
+    "MEMORY_DIGEST_PREDICATE",
+    "MemoryRelationDef",
     "SemanticsRegistry",
     "load_semantics_registry",
     "resolve_semantics_registry_path",

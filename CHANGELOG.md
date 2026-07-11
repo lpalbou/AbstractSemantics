@@ -2,6 +2,33 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.0.5] - 2026-07-10
+
+### Added
+
+- Declared the AbstractMemory typed-record edge vocabulary as a new
+  `memory_relations` registry section (`summarizes`, `mentions`,
+  `written_amid`, `from_session`, `reflected_in`, `continues`,
+  `derived_from`) per decision `0016-vocabulary-direction` (2026-07-10):
+  plain words are the canonical at-rest spelling; standard-ontology CURIEs
+  ride each entry's `equivalent` list as export/interop metadata only.
+- New `MemoryRelationDef` dataclass, `SemanticsRegistry.memory_relation_ids()`,
+  `SemanticsRegistry.memory_record_predicate_ids()` (the AbstractMemory
+  validation set: declared relations + digest predicate), and the
+  `MEMORY_DIGEST_PREDICATE` constant (`"dcterms:abstract"`).
+- Declared the `prov` prefix (PROV-O) for equivalence metadata.
+- Registry `version` bumped to 1.
+
+### Notes
+
+- `memory_relations` is deliberately disjoint from `predicates` (test-pinned):
+  the `predicates` list feeds the KG-extraction structured-output enum, and
+  memory plain words must never surface there.
+- Widening rule (both directions, on record with the memory seat): no new
+  relation engraves in AbstractMemory before it is declared here; nothing is
+  added here without coordinating with the memory seat. Ids are never renamed
+  or removed (append-only journals engrave them permanently).
+
 ## [0.0.4] - 2026-05-08
 
 ### Added

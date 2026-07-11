@@ -4,9 +4,12 @@
 
 ## Registry
 
-- `SemanticsRegistry`: frozen dataclass with fields `version`, `prefixes`, `predicates`, `entity_types`
+- `SemanticsRegistry`: frozen dataclass with fields `version`, `prefixes`, `predicates`, `entity_types`, `memory_relations`
   - `predicate_ids() -> set[str]`
   - `entity_type_ids() -> set[str]`
+  - `memory_relation_ids() -> set[str]`
+  - `memory_record_predicate_ids() -> set[str]` — declared memory relations plus `MEMORY_DIGEST_PREDICATE`; the validation set for AbstractMemory record writes
+- `MEMORY_DIGEST_PREDICATE: str` — `"dcterms:abstract"`, the digest predicate for memory records
 - `resolve_semantics_registry_path() -> pathlib.Path`
   - default: `abstractsemantics/semantics.yaml` (in this repo: `src/abstractsemantics/semantics.yaml`)
   - override: `ABSTRACTSEMANTICS_REGISTRY_PATH`
@@ -14,12 +17,13 @@
 
 ### Registry entry shapes (returned objects)
 
-While only `SemanticsRegistry` is re-exported at top-level, the registry loader returns immutable dataclass instances for entries too (defined in `src/abstractsemantics/registry.py`):
+While `SemanticsRegistry` and `MemoryRelationDef` are re-exported at top-level, the registry loader returns immutable dataclass instances for the other entries too (defined in `src/abstractsemantics/registry.py`):
 
 - `PredicateDef`: `id`, `label?`, `inverse?`, `description?`
 - `EntityTypeDef`: `id`, `label?`, `parent?`, `description?`
+- `MemoryRelationDef`: `id` (plain word), `label?`, `description?`, `equivalent` (tuple of standard CURIEs, interop metadata only)
 
-These entry classes are not part of the explicitly re-exported top-level API. For compatibility, prefer treating them as simple records and rely on the documented fields (especially `id`).
+`PredicateDef`/`EntityTypeDef` are not part of the explicitly re-exported top-level API. For compatibility, prefer treating them as simple records and rely on the documented fields (especially `id`).
 
 You can treat these as simple, frozen objects with attributes:
 
