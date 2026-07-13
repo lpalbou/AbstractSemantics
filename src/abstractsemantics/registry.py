@@ -40,12 +40,21 @@ class MemoryRelationDef:
     KG-extraction structured-output enum. `equivalent` carries equal-or-
     broader standard CURIEs as export/interop metadata only — never a second
     at-rest spelling (decision:0016-vocabulary-direction, 2026-07-10).
+
+    `subject_role`/`object_role` (added 2026-07-12) carry the authoritative
+    edge DIRECTION in machine-readable form — short role nouns for each
+    endpoint (e.g. supports: subject_role="evidence", object_role="claim").
+    Writers with caller-asserted endpoints (memory's disposal
+    confirm_relation) consume these for direction validation and error
+    messages instead of hardcoding a second copy of the semantics.
     """
 
     id: str
     label: Optional[str] = None
     description: Optional[str] = None
     equivalent: tuple[str, ...] = ()
+    subject_role: Optional[str] = None
+    object_role: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -169,6 +178,8 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
                 label=item.get("label") if isinstance(item.get("label"), str) else None,
                 description=item.get("description") if isinstance(item.get("description"), str) else None,
                 equivalent=equivalent,
+                subject_role=item.get("subject_role") if isinstance(item.get("subject_role"), str) else None,
+                object_role=item.get("object_role") if isinstance(item.get("object_role"), str) else None,
             )
         )
 

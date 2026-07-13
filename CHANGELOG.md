@@ -2,7 +2,7 @@
 
 All notable changes to this package are documented in this file.
 
-## [0.0.5] - 2026-07-10
+## [0.0.5] - 2026-07-10 (amended 2026-07-12)
 
 ### Added
 
@@ -18,6 +18,24 @@ All notable changes to this package are documented in this file.
   `MEMORY_DIGEST_PREDICATE` constant (`"dcterms:abstract"`).
 - Declared the `prov` prefix (PROV-O) for equivalence metadata.
 - Registry `version` bumped to 1.
+- **Widening batch (2026-07-12, coordinated with the memory seat per the
+  standing rule)**: four relations join `memory_relations` — `refines`
+  (`prov:wasRevisionOf`; live writer: world-model revision chains),
+  `answers` (`cito:repliesTo`; the edge form — distinct from the
+  `attributes.answers` reference on diary entries), `supports`
+  (`cito:supports`; subject = the evidence, object = the claim supported),
+  and `part_of` (`dcterms:isPartOf`). The latter three gained a writer path
+  through memory's disposal surface (`confirm_relation`). Registry `version`
+  bumped to 2. `resolves` is deliberately NOT declared (reader-only today;
+  declaration IS permission in this design — it follows the widening rule
+  when memory ships its writer).
+- **Machine-readable direction (2026-07-12, memory's ask)**: every
+  `memory_relations` entry now declares `subject_role`/`object_role` (short
+  role nouns, e.g. `supports`: evidence → claim), carried on
+  `MemoryRelationDef`. Writers with caller-asserted endpoints (disposal
+  `confirm_relation`) validate direction against these instead of
+  hardcoding a second copy of the semantics. Test-pinned: every entry must
+  carry both roles.
 
 ### Notes
 
@@ -28,6 +46,20 @@ All notable changes to this package are documented in this file.
   relation engraves in AbstractMemory before it is declared here; nothing is
   added here without coordinating with the memory seat. Ids are never renamed
   or removed (append-only journals engrave them permanently).
+- Direction convention revised (2026-07-12): each entry's description defines
+  the authoritative direction; subject-is-the-new-record stays structural for
+  formation writers, while disposal-confirmed edges carry caller-asserted
+  endpoints (per-relation enforcement is memory's lane, flagged on the hub).
+- Equivalence policy recorded: one MOST-SPECIFIC term per entry (`refines`
+  lists `prov:wasRevisionOf` alone — a PROV-aware importer infers the broader
+  `prov:wasDerivedFrom`; double-emitting adds nothing). The known overlap
+  between `equivalent` CURIEs and KG predicate ids (`schema:mentions`,
+  `schema:previousItem`, `cito:supports`, `dcterms:isPartOf`) is declared and
+  test-pinned so a new instance is a decision, not drift.
+- Release-lineage note: no released artifact ever served registry version 1
+  (0.0.4 served version 0); the released jump is 0 → 2 in one package
+  version. Version 1 is kept distinct in the records because durable
+  decision-store and backlog entries cite "version 1 = seven relations".
 
 ## [0.0.4] - 2026-05-08
 

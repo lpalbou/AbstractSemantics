@@ -63,8 +63,9 @@ Each item under `memory_relations` becomes a `MemoryRelationDef` dataclass insta
 - `equivalent` (optional): list of standard-ontology CURIEs (equal-or-broader terms) carried as export/interop metadata only
 
 This vocabulary is the declared edge-relation set for AbstractMemory's typed
-memory records (decision `0016-vocabulary-direction`, 2026-07-10). Design
-rules, in force:
+memory records (decision `0016-vocabulary-direction`, 2026-07-10; widened
+2026-07-12 with `refines`, `answers`, `supports`, `part_of` when their
+writers shipped). Design rules, in force:
 
 - **Plain words are the canonical at-rest spelling.** Memory journals are
   append-only and equality-key predicate strings with no alias resolution at
@@ -81,7 +82,22 @@ rules, in force:
 - **Append-widen only, coordinated.** No new relation is engraved by
   AbstractMemory before it is declared here, and nothing is added here
   without coordinating with the memory seat. Ids are never renamed or
-  removed.
+  removed. Declaration IS permission: a declared id immediately joins the
+  validation set, so anticipated-but-writerless words (e.g. `resolves`,
+  which has a reader in `situate` but no writer) stay out until their
+  writer ships.
+- **Direction convention (revised 2026-07-12).** Each entry's description
+  defines the authoritative direction. For formation-time writers,
+  subject = the newly formed record (structural). Disposal-confirmed edges
+  (`confirm_relation`) carry caller-asserted endpoints that must match the
+  description's direction — enforcement lives with the memory engine.
+- **Equivalence policy: one most-specific term.** `refines` lists
+  `prov:wasRevisionOf` alone, never also its superproperty
+  `prov:wasDerivedFrom` — a PROV-aware importer infers the broader term.
+  The known overlap between `equivalent` CURIEs and KG predicate ids
+  (`schema:mentions`, `schema:previousItem`, `cito:supports`,
+  `dcterms:isPartOf`) is declared and test-pinned; safe because validation
+  accepts only plain-word ids and `equivalent` is export-only.
 - **Validation set.** `SemanticsRegistry.memory_record_predicate_ids()`
   returns the declared relation ids plus the digest predicate
   (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`) — the set AbstractMemory's

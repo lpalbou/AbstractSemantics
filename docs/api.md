@@ -21,7 +21,7 @@ While `SemanticsRegistry` and `MemoryRelationDef` are re-exported at top-level, 
 
 - `PredicateDef`: `id`, `label?`, `inverse?`, `description?`
 - `EntityTypeDef`: `id`, `label?`, `parent?`, `description?`
-- `MemoryRelationDef`: `id` (plain word), `label?`, `description?`, `equivalent` (tuple of standard CURIEs, interop metadata only)
+- `MemoryRelationDef`: `id` (plain word), `label?`, `description?`, `equivalent` (tuple of standard CURIEs, interop metadata only), `subject_role?`/`object_role?` (machine-readable edge direction — short role nouns, e.g. `supports`: subject_role `evidence`, object_role `claim`; direction-validating writers consume these instead of hardcoding semantics)
 
 `PredicateDef`/`EntityTypeDef` are not part of the explicitly re-exported top-level API. For compatibility, prefer treating them as simple records and rely on the documented fields (especially `id`).
 

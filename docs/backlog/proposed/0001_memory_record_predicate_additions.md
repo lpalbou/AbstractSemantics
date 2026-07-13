@@ -190,3 +190,46 @@ declared with NO live writer yet (first engraving will come through
 remember_many edges — already in-set). NOT edges: answers/resolves are record
 attributes; supports/part_of have no shipped writer (routing policy + report
 prose only). Bidirectional widening commitment re-stated by both seats.
+
+## Addendum 2026-07-12 — widening batch (thread REOPENED and closed same-day)
+
+Memory's 0033 wave (world-model cards + disposal) changed the writer census;
+their sync note (agora c1148) invoked the widening rule. Verified in their
+source before declaring; one fable5 adversary attacked the batch (9 findings,
+all folded). Registry version 1 → 2; four entries added:
+
+- `refines` → `prov:wasRevisionOf` — LIVE writer (`world_model.py`: new card
+  revision → refines → prior revision; direction matches PROV subject=new).
+  Single most-specific term deliberately (wasRevisionOf ⊑ wasDerivedFrom; an
+  importer infers the broader term — double-emitting adds nothing).
+- `answers` → `cito:repliesTo` — writer path = disposal `confirm_relation`
+  (DISPOSAL_RELATIONS). Forward-direction CiTO term (answer → question),
+  consistent with the 2026-07-10 addendum's own example pair; the shipped
+  `situate` reader already consumes this direction (object joins
+  resolved_refs). Description disambiguates from `attributes.answers`.
+- `supports` → `cito:supports` — writer path = disposal. Direction:
+  subject = evidence, object = claim (CiTO). FLAGGED TO MEMORY: their
+  `maintenance._unsourced_lessons` counts subject-of-supports as "sourced"
+  (the inverse reading — cito:obtainsSupportFrom wearing this name) and its
+  action text teaches lesson-as-subject; must flip to object-of-supports or
+  the first guided re-digestion engraves permanently backwards edges.
+- `part_of` → `dcterms:isPartOf` — writer path = disposal; subject = part
+  (dcterms generic; schema:isPartOf is CreativeWork-scoped).
+
+Census changes recorded: disposal `confirm_relation` is also a NEW writer
+path for five already-declared relations (summarizes/from_session/
+reflected_in/continues/derived_from) with CALLER-asserted direction — the
+registry's direction header revised accordingly (formation-structural vs
+disposal-asserted; per-relation enforcement asked of memory). `resolves`
+gained a READER (`situate`, subject=resolver object=tension) but no writer:
+deliberately NOT declared (declaration IS permission — a declared id joins
+the validation set immediately); watched here. Also flagged to memory:
+`reflected_in` sitting in DISPOSAL_RELATIONS looks like a category error by
+disposal's own act-frame standard (written_amid was excluded for exactly
+that reason), and confirm_relation does not check the containment rule
+(non-private projections only) the registry description states.
+
+Equivalent∩KG-predicate overlap declared + test-pinned ({schema:mentions,
+schema:previousItem, cito:supports, dcterms:isPartOf}); tests 8 → 9, count
+comment updated; CHANGELOG amended (release-lineage note: no released
+artifact served registry v1 — the released jump is 0 → 2).

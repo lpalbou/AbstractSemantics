@@ -5,10 +5,12 @@ from abstractsemantics import (
     load_semantics_registry,
 )
 
-# The seven plain-word memory-record relations declared per
-# decision:0016-vocabulary-direction (2026-07-10). Engraved append-only —
-# this set may WIDEN (coordinated with the memory seat) but an id must never
-# be renamed or removed.
+# The plain-word memory-record relations declared per
+# decision:0016-vocabulary-direction (2026-07-10, seven relations) plus the
+# 2026-07-12 widening batch (refines live via world-model revision chains;
+# answers/supports/part_of disposal-writable via confirm_relation). Engraved
+# append-only — this set may WIDEN (coordinated with the memory seat) but an
+# id must never be renamed or removed.
 DECLARED_MEMORY_RELATIONS = {
     "summarizes",
     "mentions",
@@ -17,6 +19,10 @@ DECLARED_MEMORY_RELATIONS = {
     "reflected_in",
     "continues",
     "derived_from",
+    "refines",
+    "answers",
+    "supports",
+    "part_of",
 }
 
 
@@ -63,4 +69,30 @@ def test_memory_relations_never_leak_into_kg_predicates():
     structured-output enum fed to extractors."""
     reg = load_semantics_registry()
     assert not (reg.predicate_ids() & reg.memory_relation_ids())
+
+
+def test_memory_relations_carry_direction_roles():
+    """Every memory relation declares subject_role/object_role — the
+    machine-readable direction carrier (2026-07-12) that writers with
+    caller-asserted endpoints (memory's disposal confirm_relation) validate
+    against, instead of hardcoding a second copy of the semantics."""
+    reg = load_semantics_registry()
+    for rel in reg.memory_relations:
+        assert rel.subject_role and rel.subject_role.strip(), f"{rel.id}: missing subject_role"
+        assert rel.object_role and rel.object_role.strip(), f"{rel.id}: missing object_role"
+
+
+def test_equivalent_overlap_with_kg_predicates_is_the_declared_set():
+    """Some memory-relation `equivalent` CURIEs legitimately coincide with ids
+    in the KG predicate list (export-only metadata; memory validation refuses
+    CURIE-spelled edges, so no at-rest collision can arise). The overlap is
+    DECLARED — a new instance must be a decision, never drift."""
+    reg = load_semantics_registry()
+    equivalents = {eq for rel in reg.memory_relations for eq in rel.equivalent}
+    assert equivalents & reg.predicate_ids() == {
+        "schema:mentions",
+        "schema:previousItem",
+        "cito:supports",
+        "dcterms:isPartOf",
+    }
 

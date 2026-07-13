@@ -541,8 +541,9 @@ Each item under `memory_relations` becomes a `MemoryRelationDef` dataclass insta
 - `equivalent` (optional): list of standard-ontology CURIEs (equal-or-broader terms) carried as export/interop metadata only
 
 This vocabulary is the declared edge-relation set for AbstractMemory's typed
-memory records (decision `0016-vocabulary-direction`, 2026-07-10). Design
-rules, in force:
+memory records (decision `0016-vocabulary-direction`, 2026-07-10; widened
+2026-07-12 with `refines`, `answers`, `supports`, `part_of` when their
+writers shipped). Design rules, in force:
 
 - **Plain words are the canonical at-rest spelling.** Memory journals are
   append-only and equality-key predicate strings with no alias resolution at
@@ -559,7 +560,22 @@ rules, in force:
 - **Append-widen only, coordinated.** No new relation is engraved by
   AbstractMemory before it is declared here, and nothing is added here
   without coordinating with the memory seat. Ids are never renamed or
-  removed.
+  removed. Declaration IS permission: a declared id immediately joins the
+  validation set, so anticipated-but-writerless words (e.g. `resolves`,
+  which has a reader in `situate` but no writer) stay out until their
+  writer ships.
+- **Direction convention (revised 2026-07-12).** Each entry's description
+  defines the authoritative direction. For formation-time writers,
+  subject = the newly formed record (structural). Disposal-confirmed edges
+  (`confirm_relation`) carry caller-asserted endpoints that must match the
+  description's direction — enforcement lives with the memory engine.
+- **Equivalence policy: one most-specific term.** `refines` lists
+  `prov:wasRevisionOf` alone, never also its superproperty
+  `prov:wasDerivedFrom` — a PROV-aware importer infers the broader term.
+  The known overlap between `equivalent` CURIEs and KG predicate ids
+  (`schema:mentions`, `schema:previousItem`, `cito:supports`,
+  `dcterms:isPartOf`) is declared and test-pinned; safe because validation
+  accepts only plain-word ids and `equivalent` is export-only.
 - **Validation set.** `SemanticsRegistry.memory_record_predicate_ids()`
   returns the declared relation ids plus the digest predicate
   (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`) — the set AbstractMemory's
@@ -913,7 +929,7 @@ While `SemanticsRegistry` and `MemoryRelationDef` are re-exported at top-level, 
 
 - `PredicateDef`: `id`, `label?`, `inverse?`, `description?`
 - `EntityTypeDef`: `id`, `label?`, `parent?`, `description?`
-- `MemoryRelationDef`: `id` (plain word), `label?`, `description?`, `equivalent` (tuple of standard CURIEs, interop metadata only)
+- `MemoryRelationDef`: `id` (plain word), `label?`, `description?`, `equivalent` (tuple of standard CURIEs, interop metadata only), `subject_role?`/`object_role?` (machine-readable edge direction — short role nouns, e.g. `supports`: subject_role `evidence`, object_role `claim`; direction-validating writers consume these instead of hardcoding semantics)
 
 `PredicateDef`/`EntityTypeDef` are not part of the explicitly re-exported top-level API. For compatibility, prefer treating them as simple records and rely on the documented fields (especially `id`).
 
@@ -1013,7 +1029,7 @@ python scripts/generate_llms_full.py
 ## src/abstractsemantics/semantics.yaml
 
 ```yaml
-version: 1
+version: 2
 
 prefixes:
   dcterms: "http://purl.org/dc/terms/"
@@ -1154,46 +1170,100 @@ predicates:
 # The digest predicate for memory records is `dcterms:abstract` (declared in
 # `predicates:` above); AbstractMemory's validation set = these ids plus it.
 #
-# Direction convention: subject = the authored/newer record, object = the
-# target record it points at (confirmed against every shipped writer,
-# memory review 2026-07-10).
+# Direction convention (revised 2026-07-12 with the disposal writer path):
+# each entry's DESCRIPTION defines the authoritative semantic direction.
+# For FORMATION-time writers the rule subject = the authored/newer record is
+# structural (edges ride the newly formed record). Disposal-confirmed edges
+# (confirm_relation) carry CALLER-asserted endpoints — the caller must match
+# the description's direction; enforcement is memory's lane (flagged
+# 2026-07-12).
 #
 # `equivalent` lists are MANY-TO-ONE and LOSSY interop hints: several plain
 # words may share one broader CURIE (summarizes/from_session/derived_from
 # all specialize prov:wasDerivedFrom) — the mapping is never reversible and
-# must never drive an import back to plain words.
+# must never drive an import back to plain words. Policy: one MOST-SPECIFIC
+# term per entry (refines lists prov:wasRevisionOf alone, never also its
+# superproperty prov:wasDerivedFrom — a PROV-aware importer infers it).
+#
+# KNOWN OVERLAP (declared, not drift): some `equivalent` CURIEs also appear
+# as ids in `predicates:` above (schema:mentions, schema:previousItem,
+# cito:supports, dcterms:isPartOf). Safe by construction — memory validation
+# accepts only the plain-word ids (a CURIE-spelled memory edge is refused),
+# and `equivalent` is export-only. A test pins this exact overlap set so a
+# new instance is a decision, not drift.
 #
 # Widening rule (both ways, e-s 143/145): no new relation engraves before a
 # declaration lands here, coordinated with the memory seat; nothing is added
-# here without coordinating with memory.
+# here without coordinating with memory. Declaration IS permission: a
+# declared id immediately joins memory_record_predicate_ids(), so watched
+# not-yet-written words (e.g. `resolves`, reader-only today) stay OUT of
+# this section until their writer ships — the watch lives in backlog 0001.
 memory_relations:
   - id: "summarizes"
     label: "summarizes"
     description: "A summary/reflection record names a source record it condenses (a summary must name its sources)."
     equivalent: ["prov:wasDerivedFrom"]
+    subject_role: "summary"
+    object_role: "source"
   - id: "mentions"
     label: "mentions"
     description: "Weak associative link from a record to one it references without deriving from it (e.g. dream records naming their source islands)."
     equivalent: ["schema:mentions"]
+    subject_role: "referencing record"
+    object_role: "referenced record"
   - id: "written_amid"
     label: "written amid"
     description: "Act-frame co-presence: a diary projection points at the graph records attended at write time. No exact standard-ontology equivalent (broadest near term: prov:wasInfluencedBy); deliberately unmapped."
+    subject_role: "diary projection"
+    object_role: "attended record"
   - id: "from_session"
     label: "from session"
     description: "An elected identity record (e.g. an interest) points at the session record it grew out of."
     equivalent: ["prov:wasDerivedFrom"]
+    subject_role: "elected record"
+    object_role: "session"
   - id: "reflected_in"
     label: "reflected in"
     description: "An exchange/episode points at a diary entry elected during it (the exchange is the subject the entry reflects on). Only non-private projections carry this edge — private diary projections carry no edges by the containment rule."
     equivalent: ["schema:subjectOf"]
+    subject_role: "exchange"
+    object_role: "diary entry"
   - id: "continues"
     label: "continues"
     description: "An episode points at the immediately preceding episode in its session chain."
     equivalent: ["schema:previousItem"]
+    subject_role: "episode"
+    object_role: "preceding episode"
   - id: "derived_from"
     label: "derived from"
     description: "General derivation: a record points at the source material it was derived from."
     equivalent: ["prov:wasDerivedFrom"]
+    subject_role: "derived record"
+    object_role: "source"
+  - id: "refines"
+    label: "refines"
+    description: "A newer revision points at the record it revises and supersedes (revision chains, e.g. world-model orientation cards)."
+    equivalent: ["prov:wasRevisionOf"]
+    subject_role: "new revision"
+    object_role: "prior revision"
+  - id: "answers"
+    label: "answers"
+    description: "A record answers a question record (subject = the answering record, object = the question). Distinct from the attributes.answers REFERENCE on diary entries (a book entry / record id, not an edge)."
+    equivalent: ["cito:repliesTo"]
+    subject_role: "answer"
+    object_role: "question"
+  - id: "supports"
+    label: "supports"
+    description: "A record provides evidential support for another (subject = the supporting evidence, object = the claim/lesson/record supported — cito:supports direction; the inverse reading is a distinct word, never this one)."
+    equivalent: ["cito:supports"]
+    subject_role: "evidence"
+    object_role: "claim"
+  - id: "part_of"
+    label: "part of"
+    description: "A record is a component of a larger record or story (subject = the part, object = the whole)."
+    equivalent: ["dcterms:isPartOf"]
+    subject_role: "part"
+    object_role: "whole"
 
 entity_types:
   # Generic "real-world thing" catch-all (includes physical objects).
@@ -1313,12 +1383,21 @@ class MemoryRelationDef:
     KG-extraction structured-output enum. `equivalent` carries equal-or-
     broader standard CURIEs as export/interop metadata only — never a second
     at-rest spelling (decision:0016-vocabulary-direction, 2026-07-10).
+
+    `subject_role`/`object_role` (added 2026-07-12) carry the authoritative
+    edge DIRECTION in machine-readable form — short role nouns for each
+    endpoint (e.g. supports: subject_role="evidence", object_role="claim").
+    Writers with caller-asserted endpoints (memory's disposal
+    confirm_relation) consume these for direction validation and error
+    messages instead of hardcoding a second copy of the semantics.
     """
 
     id: str
     label: Optional[str] = None
     description: Optional[str] = None
     equivalent: tuple[str, ...] = ()
+    subject_role: Optional[str] = None
+    object_role: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -1442,6 +1521,8 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
                 label=item.get("label") if isinstance(item.get("label"), str) else None,
                 description=item.get("description") if isinstance(item.get("description"), str) else None,
                 equivalent=equivalent,
+                subject_role=item.get("subject_role") if isinstance(item.get("subject_role"), str) else None,
+                object_role=item.get("object_role") if isinstance(item.get("object_role"), str) else None,
             )
         )
 
@@ -1648,10 +1729,12 @@ from abstractsemantics import (
     load_semantics_registry,
 )
 
-# The seven plain-word memory-record relations declared per
-# decision:0016-vocabulary-direction (2026-07-10). Engraved append-only —
-# this set may WIDEN (coordinated with the memory seat) but an id must never
-# be renamed or removed.
+# The plain-word memory-record relations declared per
+# decision:0016-vocabulary-direction (2026-07-10, seven relations) plus the
+# 2026-07-12 widening batch (refines live via world-model revision chains;
+# answers/supports/part_of disposal-writable via confirm_relation). Engraved
+# append-only — this set may WIDEN (coordinated with the memory seat) but an
+# id must never be renamed or removed.
 DECLARED_MEMORY_RELATIONS = {
     "summarizes",
     "mentions",
@@ -1660,6 +1743,10 @@ DECLARED_MEMORY_RELATIONS = {
     "reflected_in",
     "continues",
     "derived_from",
+    "refines",
+    "answers",
+    "supports",
+    "part_of",
 }
 
 
@@ -1706,6 +1793,32 @@ def test_memory_relations_never_leak_into_kg_predicates():
     structured-output enum fed to extractors."""
     reg = load_semantics_registry()
     assert not (reg.predicate_ids() & reg.memory_relation_ids())
+
+
+def test_memory_relations_carry_direction_roles():
+    """Every memory relation declares subject_role/object_role — the
+    machine-readable direction carrier (2026-07-12) that writers with
+    caller-asserted endpoints (memory's disposal confirm_relation) validate
+    against, instead of hardcoding a second copy of the semantics."""
+    reg = load_semantics_registry()
+    for rel in reg.memory_relations:
+        assert rel.subject_role and rel.subject_role.strip(), f"{rel.id}: missing subject_role"
+        assert rel.object_role and rel.object_role.strip(), f"{rel.id}: missing object_role"
+
+
+def test_equivalent_overlap_with_kg_predicates_is_the_declared_set():
+    """Some memory-relation `equivalent` CURIEs legitimately coincide with ids
+    in the KG predicate list (export-only metadata; memory validation refuses
+    CURIE-spelled edges, so no at-rest collision can arise). The overlap is
+    DECLARED — a new instance must be a decision, never drift."""
+    reg = load_semantics_registry()
+    equivalents = {eq for rel in reg.memory_relations for eq in rel.equivalent}
+    assert equivalents & reg.predicate_ids() == {
+        "schema:mentions",
+        "schema:previousItem",
+        "cito:supports",
+        "dcterms:isPartOf",
+    }
 ```
 ---
 
@@ -1759,7 +1872,7 @@ def test_resolve_schema_ref_returns_concrete_schema() -> None:
 
 All notable changes to this package are documented in this file.
 
-## [0.0.5] - 2026-07-10
+## [0.0.5] - 2026-07-10 (amended 2026-07-12)
 
 ### Added
 
@@ -1775,6 +1888,24 @@ All notable changes to this package are documented in this file.
   `MEMORY_DIGEST_PREDICATE` constant (`"dcterms:abstract"`).
 - Declared the `prov` prefix (PROV-O) for equivalence metadata.
 - Registry `version` bumped to 1.
+- **Widening batch (2026-07-12, coordinated with the memory seat per the
+  standing rule)**: four relations join `memory_relations` — `refines`
+  (`prov:wasRevisionOf`; live writer: world-model revision chains),
+  `answers` (`cito:repliesTo`; the edge form — distinct from the
+  `attributes.answers` reference on diary entries), `supports`
+  (`cito:supports`; subject = the evidence, object = the claim supported),
+  and `part_of` (`dcterms:isPartOf`). The latter three gained a writer path
+  through memory's disposal surface (`confirm_relation`). Registry `version`
+  bumped to 2. `resolves` is deliberately NOT declared (reader-only today;
+  declaration IS permission in this design — it follows the widening rule
+  when memory ships its writer).
+- **Machine-readable direction (2026-07-12, memory's ask)**: every
+  `memory_relations` entry now declares `subject_role`/`object_role` (short
+  role nouns, e.g. `supports`: evidence → claim), carried on
+  `MemoryRelationDef`. Writers with caller-asserted endpoints (disposal
+  `confirm_relation`) validate direction against these instead of
+  hardcoding a second copy of the semantics. Test-pinned: every entry must
+  carry both roles.
 
 ### Notes
 
@@ -1785,6 +1916,20 @@ All notable changes to this package are documented in this file.
   relation engraves in AbstractMemory before it is declared here; nothing is
   added here without coordinating with the memory seat. Ids are never renamed
   or removed (append-only journals engrave them permanently).
+- Direction convention revised (2026-07-12): each entry's description defines
+  the authoritative direction; subject-is-the-new-record stays structural for
+  formation writers, while disposal-confirmed edges carry caller-asserted
+  endpoints (per-relation enforcement is memory's lane, flagged on the hub).
+- Equivalence policy recorded: one MOST-SPECIFIC term per entry (`refines`
+  lists `prov:wasRevisionOf` alone — a PROV-aware importer infers the broader
+  `prov:wasDerivedFrom`; double-emitting adds nothing). The known overlap
+  between `equivalent` CURIEs and KG predicate ids (`schema:mentions`,
+  `schema:previousItem`, `cito:supports`, `dcterms:isPartOf`) is declared and
+  test-pinned so a new instance is a decision, not drift.
+- Release-lineage note: no released artifact ever served registry version 1
+  (0.0.4 served version 0); the released jump is 0 → 2 in one package
+  version. Version 1 is kept distinct in the records because durable
+  decision-store and backlog entries cite "version 1 = seven relations".
 
 ## [0.0.4] - 2026-05-08
 
