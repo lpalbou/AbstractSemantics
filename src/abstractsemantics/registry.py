@@ -89,13 +89,16 @@ def resolve_semantics_registry_path() -> Path:
     """Resolve the registry YAML path.
 
     Env override:
-    - ABSTRACTSEMANTICS_REGISTRY_PATH
+    - ABSTRACTSEMANTICS_REGISTRY_PATH (relative paths resolve against the
+      current working directory; errors always name the resolved path)
     """
     raw = os.getenv("ABSTRACTSEMANTICS_REGISTRY_PATH")
     if isinstance(raw, str) and raw.strip():
         p = Path(raw).expanduser().resolve()
         if not p.exists():
             raise FileNotFoundError(f"ABSTRACTSEMANTICS_REGISTRY_PATH does not exist: {p}")
+        if not p.is_file():
+            raise FileNotFoundError(f"ABSTRACTSEMANTICS_REGISTRY_PATH is not a file: {p}")
         return p
     return Path(__file__).with_name("semantics.yaml")
 
@@ -106,7 +109,12 @@ def _as_list(value: Any) -> list:
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     raw = path.read_text(encoding="utf-8")
-    data = yaml.safe_load(raw)
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError as e:
+        # PyYAML parses the string and reports '<unicode string>' — the
+        # operator hand-editing a registry needs the FILE named.
+        raise ValueError(f"Invalid YAML in semantics registry {path}: {e}") from e
     return data if isinstance(data, dict) else {}
 
 
@@ -185,6 +193,30 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
 
     if not predicates:
         raise ValueError(f"Semantics registry has no predicates: {p}")
+
+    # Structural invariants for memory_relations are enforced at LOAD time —
+    # unlike predicates/entity_types (which feed enums and fail soft), a
+    # declared memory relation immediately joins memory_record_predicate_ids()
+    # whose consumer engraves edges into append-only journals: a config typo
+    # would become a permanent at-rest spelling. Load is the only cheap place
+    # to fail (declaration IS permission).
+    predicate_id_set = {d.id for d in predicates}
+    for rel in memory_relations:
+        if ":" in rel.id:
+            raise ValueError(
+                f"Semantics registry {p}: memory relation id {rel.id!r} must be a "
+                f"plain word (no CURIE prefix) — plain words are canonical at rest"
+            )
+        if rel.id in predicate_id_set:
+            raise ValueError(
+                f"Semantics registry {p}: memory relation id {rel.id!r} collides "
+                f"with a KG predicate id — the two vocabularies must stay disjoint"
+            )
+        if not (rel.subject_role and rel.subject_role.strip()) or not (rel.object_role and rel.object_role.strip()):
+            raise ValueError(
+                f"Semantics registry {p}: memory relation {rel.id!r} must declare "
+                f"both subject_role and object_role (writers validate direction against them)"
+            )
 
     return SemanticsRegistry(
         version=version,

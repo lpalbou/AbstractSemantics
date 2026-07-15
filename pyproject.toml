@@ -29,4 +29,4 @@ include = ["abstractsemantics*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-abstractsemantics = ["*.yaml", "*.yml"]
+abstractsemantics = ["*.yaml", "*.yml", "py.typed"]

@@ -44,6 +44,13 @@ Invalid items are skipped. If no valid predicates remain, `load_semantics_regist
 
 ## Entity-type definitions
 
+Naming note: `entity_types` are NER-sense classes for KG extraction (what
+kind of thing a knowledge-graph node is). They are unrelated to the
+framework's *summoned entities* (named persistent identities with homes and
+phases) — that vocabulary lives in the gateway/runtime lanes, and the
+preferred term there is "summoned entity" precisely because "named entity"
+collides with NER here.
+
 Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance with:
 
 - `id` (required): string, typically a CURIE like `schema:Person`
@@ -110,6 +117,12 @@ writers shipped). Design rules, in force:
   `KIND_RANKS`): consumers import the owning set rather than copying it. A
   registry declaration of those sets would create a second authority that
   could disagree with the refusing code — the drift class one level up.
+  The same boundary covers writer-owned closed sets this seat merely
+  DESIGNED (designed-here ≠ owned-here): the entity phase keys
+  (visit/work/personal/sleep), the `phase_changed` marker cause set, and the
+  `phases.yaml` mode enum (`disabled|timer|until_revoked`) are owned by
+  their writer packages (gateway/runtime) — they must never be filed into
+  this registry either.
 
 ## Minimal example
 

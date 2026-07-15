@@ -96,3 +96,56 @@ def test_equivalent_overlap_with_kg_predicates_is_the_declared_set():
         "dcterms:isPartOf",
     }
 
+
+# --- loader robustness (production-readiness wave, 2026-07-13) ---------------
+
+
+def test_loader_names_the_file_on_yaml_syntax_error(tmp_path):
+    """A hand-editing operator's first typo must produce an error naming the
+    FILE — bare PyYAML reports '<unicode string>', which names nothing."""
+    import pytest
+
+    bad = tmp_path / "broken.yaml"
+    bad.write_text("predicates:\n\t- id: x\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="broken.yaml"):
+        load_semantics_registry(bad)
+
+
+def test_loader_enforces_memory_relation_invariants(tmp_path):
+    """memory_relations feed append-only journal writers (declaration IS
+    permission) — structural typos in a custom/override registry must fail
+    LOUD at load, never engrave. Predicates/entity_types keep item-skip
+    leniency (they feed enums and fail soft); this section does not."""
+    import pytest
+
+    base = (
+        "version: 1\n"
+        "predicates:\n"
+        '  - id: "dcterms:title"\n'
+        "entity_types:\n"
+        '  - id: "schema:Thing"\n'
+    )
+
+    curie = tmp_path / "curie.yaml"
+    curie.write_text(
+        base + 'memory_relations:\n  - id: "prov:used"\n    subject_role: a\n    object_role: b\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="plain word"):
+        load_semantics_registry(curie)
+
+    collide = tmp_path / "collide.yaml"
+    collide.write_text(
+        base + 'memory_relations:\n  - id: "title"\n    subject_role: a\n    object_role: b\n'.replace(
+            '"title"', '"dcterms:title"'
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_semantics_registry(collide)
+
+    no_roles = tmp_path / "noroles.yaml"
+    no_roles.write_text(base + 'memory_relations:\n  - id: "summarizes"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="subject_role and object_role"):
+        load_semantics_registry(no_roles)
+

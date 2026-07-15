@@ -522,6 +522,13 @@ Invalid items are skipped. If no valid predicates remain, `load_semantics_regist
 
 ## Entity-type definitions
 
+Naming note: `entity_types` are NER-sense classes for KG extraction (what
+kind of thing a knowledge-graph node is). They are unrelated to the
+framework's *summoned entities* (named persistent identities with homes and
+phases) — that vocabulary lives in the gateway/runtime lanes, and the
+preferred term there is "summoned entity" precisely because "named entity"
+collides with NER here.
+
 Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance with:
 
 - `id` (required): string, typically a CURIE like `schema:Person`
@@ -588,6 +595,12 @@ writers shipped). Design rules, in force:
   `KIND_RANKS`): consumers import the owning set rather than copying it. A
   registry declaration of those sets would create a second authority that
   could disagree with the refusing code — the drift class one level up.
+  The same boundary covers writer-owned closed sets this seat merely
+  DESIGNED (designed-here ≠ owned-here): the entity phase keys
+  (visit/work/personal/sleep), the `phase_changed` marker cause set, and the
+  `phases.yaml` mode enum (`disabled|timer|until_revoked`) are owned by
+  their writer packages (gateway/runtime) — they must never be filed into
+  this registry either.
 
 ## Minimal example
 
@@ -677,7 +690,7 @@ schema = build_kg_assertion_schema_v0(
 
 `build_kg_assertion_schema_v0()`:
 
-- restricts `predicate` to `registry.predicates[*].id` (and optionally a small alias list: `KG_PREDICATE_ALIASES_V0`)
+- restricts `predicate` to `registry.predicates[*].id` (and optionally a small alias list: `KG_PREDICATE_ALIASES_V0`, derived from the keys of the alias→canonical map `KG_PREDICATE_ALIAS_MAP_V0`)
 - restricts `attributes.subject_type` and `attributes.object_type` to `registry.entity_types[*].id`
 - requires each assertion to include:
   - `subject`, `predicate`, `object`
@@ -688,6 +701,31 @@ schema = build_kg_assertion_schema_v0(
   - if `min_assertions_when_nonempty > 0`, the schema allows either an empty list OR at least N assertions (an `anyOf` guard)
 
 If the registry has no predicate ids or no entity-type ids, it raises `ValueError`.
+
+## Normalizing aliases at the ingestion boundary
+
+If you enable `include_predicate_aliases=True`, normalize every
+extractor-emitted predicate before persisting (one spelling per predicate at
+rest):
+
+```python
+from abstractsemantics import load_semantics_registry, normalize_kg_predicate
+
+reg = load_semantics_registry()  # load ONCE — registry=None re-reads the YAML per call
+for assertion in assertions:
+    canonical = normalize_kg_predicate(assertion["predicate"], reg)
+    if canonical is None:
+        ...  # refuse loudly or store as labeled-unknown — never guess a meaning
+    else:
+        assertion["predicate"] = canonical
+```
+
+`normalize_kg_predicate()` passes canonical registry ids through, maps known
+aliases via `KG_PREDICATE_ALIAS_MAP_V0`, and returns `None` for everything
+else. Matching is whitespace-stripped then exact (case-sensitive — CURIEs
+are case-sensitive; folding would guess). Only aliases with a determinate
+canonical mapping are offered in the enum, so every offered spelling is
+guaranteed normalizable (test-pinned round trip).
 
 ## Schema shape (high level)
 
@@ -830,11 +868,19 @@ See [KG assertion JSON Schema](schema.md).
 
 ## What are “predicate aliases” and should I enable them?
 
-`src/abstractsemantics/schema.py` defines a small alias list (`KG_PREDICATE_ALIASES_V0`) for predicate strings that LLMs often emit by default.
+`src/abstractsemantics/schema.py` defines a small alias→canonical map
+(`KG_PREDICATE_ALIAS_MAP_V0`) for predicate spellings that LLMs often emit by
+default; the offered alias list (`KG_PREDICATE_ALIASES_V0`) is derived from
+its keys.
 
 - aliases are **not** part of the canonical registry YAML
-- enabling aliases (`include_predicate_aliases=True`) makes the schema accept those additional strings
-- downstream ingestion/normalization is still the right place to map aliases to canonical ids
+- enabling aliases (`include_predicate_aliases=True`) makes the schema accept those additional spellings
+- if you enable aliases, you **must** normalize at your ingestion boundary
+  with `normalize_kg_predicate()` before persisting — one spelling per
+  predicate at rest; it passes canonical ids through, maps known aliases,
+  and returns `None` for anything else (refuse or label; never guess)
+- only aliases with a determinate canonical mapping are offered — ambiguous
+  or invented spellings are deliberately absent
 
 See [KG assertion JSON Schema](schema.md).
 
@@ -948,6 +994,8 @@ print(first.id, first.label)
 - `KG_ASSERTION_SCHEMA_REF_V0: str`
 - `build_kg_assertion_schema_v0(...) -> dict`
   - important args: `include_predicate_aliases`, `max_assertions`, `min_assertions_when_nonempty`
+- `normalize_kg_predicate(predicate, registry=None) -> str | None`: ingestion-boundary normalization — canonical ids pass through, known aliases map to canonical (`KG_PREDICATE_ALIAS_MAP_V0`), anything else returns `None` (caller refuses or labels; never guesses)
+- `KG_PREDICATE_ALIAS_MAP_V0: dict[str, str]`: alias → canonical registry id (single source; the offered `KG_PREDICATE_ALIASES_V0` tuple derives from its keys)
 - `resolve_schema_ref(schema: dict) -> dict | None`
 
 ### Evidence (tests)
@@ -1265,6 +1313,12 @@ memory_relations:
     subject_role: "part"
     object_role: "whole"
 
+# NAMING NOTE (disambiguation): "entity_types" here = NER-sense classes for
+# KG extraction (what kind of thing a knowledge-graph node is: person, place,
+# concept...). This is UNRELATED to the framework's SUMMONED ENTITIES
+# (named persistent identities with homes/phases) — that vocabulary lives in
+# the gateway/runtime lanes; the maintainer's preferred term there is
+# "summoned entity" precisely because "named entity" collides with NER here.
 entity_types:
   # Generic "real-world thing" catch-all (includes physical objects).
   - id: "schema:Thing"
@@ -1321,7 +1375,10 @@ from .registry import (
 )
 from .schema import (
     KG_ASSERTION_SCHEMA_REF_V0,
+    KG_PREDICATE_ALIAS_MAP_V0,
+    KG_PREDICATE_ALIASES_V0,
     build_kg_assertion_schema_v0,
+    normalize_kg_predicate,
     resolve_schema_ref,
 )
 
@@ -1332,7 +1389,10 @@ __all__ = [
     "load_semantics_registry",
     "resolve_semantics_registry_path",
     "KG_ASSERTION_SCHEMA_REF_V0",
+    "KG_PREDICATE_ALIAS_MAP_V0",
+    "KG_PREDICATE_ALIASES_V0",
     "build_kg_assertion_schema_v0",
+    "normalize_kg_predicate",
     "resolve_schema_ref",
 ]
 ```
@@ -1432,13 +1492,16 @@ def resolve_semantics_registry_path() -> Path:
     """Resolve the registry YAML path.
 
     Env override:
-    - ABSTRACTSEMANTICS_REGISTRY_PATH
+    - ABSTRACTSEMANTICS_REGISTRY_PATH (relative paths resolve against the
+      current working directory; errors always name the resolved path)
     """
     raw = os.getenv("ABSTRACTSEMANTICS_REGISTRY_PATH")
     if isinstance(raw, str) and raw.strip():
         p = Path(raw).expanduser().resolve()
         if not p.exists():
             raise FileNotFoundError(f"ABSTRACTSEMANTICS_REGISTRY_PATH does not exist: {p}")
+        if not p.is_file():
+            raise FileNotFoundError(f"ABSTRACTSEMANTICS_REGISTRY_PATH is not a file: {p}")
         return p
     return Path(__file__).with_name("semantics.yaml")
 
@@ -1449,7 +1512,12 @@ def _as_list(value: Any) -> list:
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     raw = path.read_text(encoding="utf-8")
-    data = yaml.safe_load(raw)
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError as e:
+        # PyYAML parses the string and reports '<unicode string>' — the
+        # operator hand-editing a registry needs the FILE named.
+        raise ValueError(f"Invalid YAML in semantics registry {path}: {e}") from e
     return data if isinstance(data, dict) else {}
 
 
@@ -1529,6 +1597,30 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
     if not predicates:
         raise ValueError(f"Semantics registry has no predicates: {p}")
 
+    # Structural invariants for memory_relations are enforced at LOAD time —
+    # unlike predicates/entity_types (which feed enums and fail soft), a
+    # declared memory relation immediately joins memory_record_predicate_ids()
+    # whose consumer engraves edges into append-only journals: a config typo
+    # would become a permanent at-rest spelling. Load is the only cheap place
+    # to fail (declaration IS permission).
+    predicate_id_set = {d.id for d in predicates}
+    for rel in memory_relations:
+        if ":" in rel.id:
+            raise ValueError(
+                f"Semantics registry {p}: memory relation id {rel.id!r} must be a "
+                f"plain word (no CURIE prefix) — plain words are canonical at rest"
+            )
+        if rel.id in predicate_id_set:
+            raise ValueError(
+                f"Semantics registry {p}: memory relation id {rel.id!r} collides "
+                f"with a KG predicate id — the two vocabularies must stay disjoint"
+            )
+        if not (rel.subject_role and rel.subject_role.strip()) or not (rel.object_role and rel.object_role.strip()):
+            raise ValueError(
+                f"Semantics registry {p}: memory relation {rel.id!r} must declare "
+                f"both subject_role and object_role (writers validate direction against them)"
+            )
+
     return SemanticsRegistry(
         version=version,
         prefixes=prefixes,
@@ -1556,25 +1648,84 @@ from .registry import SemanticsRegistry, load_semantics_registry
 KG_ASSERTION_SCHEMA_REF_V0 = "abstractsemantics:kg_assertion_schema_v0"
 
 
-# Small, deterministic alias set for predicates that LLMs tend to emit by default.
+# Alias -> canonical normalization map for predicates that LLMs tend to emit
+# by default (backlog 0002, built 2026-07-13).
 #
-# These are *not* part of the canonical semantics registry. Prefer keeping
-# structured-output enums canonical (so the model is forced to pick from the
-# agreed semantics). Alias handling belongs at the ingestion boundary.
+# These aliases are *not* part of the canonical semantics registry. Prefer
+# keeping structured-output enums canonical (so the model is forced to pick
+# from the agreed semantics). When aliases ARE offered
+# (`include_predicate_aliases=True`), the ingestion boundary normalizes them
+# via `normalize_kg_predicate()` before anything persists — one spelling per
+# predicate at rest (the same rule the memory-relations vocabulary enforces).
 #
-# Keep this list intentionally small to protect model context + reduce confusion.
-KG_PREDICATE_ALIASES_V0: Sequence[str] = (
-    "schema:description",
-    "schema:creator",
-    "schema:hasParent",
-    "schema:hasMember",
-    "schema:recognizedAs",
-    "schema:hasMemorySource",
-    "schema:hasPart",
-    "schema:isPartOf",
-    "dcterms:has_part",
-    "dcterms:is_part_of",
-)
+# Design rules (the accept-vs-offer split, decision:workitem-type-enum):
+# - The OFFER set (`KG_PREDICATE_ALIASES_V0`, derived from this map's keys)
+#   contains ONLY aliases with a DETERMINATE canonical mapping. Earlier alias
+#   spellings without one (schema:hasParent — broader vs isPartOf is
+#   context-dependent; schema:hasMember — no member predicate in the
+#   registry; schema:recognizedAs — lossy vs sameAs; schema:hasMemorySource —
+#   invented term with unclear intent) were REMOVED from the offer: offering
+#   a spelling the boundary cannot normalize invites un-normalizable data.
+# - The ACCEPT side (`normalize_kg_predicate`) passes canonical ids through,
+#   maps known aliases, and returns None for everything else — the caller
+#   labels or refuses; nothing is ever silently coerced to a guessed meaning.
+# - The map's RANGE is canonical registry predicate ids only, and its keys
+#   are never themselves registry ids (both test-pinned).
+#
+# Keep this map intentionally small to protect model context + reduce confusion.
+KG_PREDICATE_ALIAS_MAP_V0: Dict[str, str] = {
+    # schema.org twins of declared dcterms ids (same meaning, one spelling at rest)
+    "schema:description": "dcterms:description",
+    "schema:creator": "dcterms:creator",
+    "schema:hasPart": "dcterms:hasPart",
+    "schema:isPartOf": "dcterms:isPartOf",
+    # snake_case spelling variants that do not exist in dcterms
+    "dcterms:has_part": "dcterms:hasPart",
+    "dcterms:is_part_of": "dcterms:isPartOf",
+}
+
+# The alias OFFER set, derived from the map's keys (never maintained by hand —
+# a second copy would drift; the map is the single source).
+KG_PREDICATE_ALIASES_V0: Sequence[str] = tuple(KG_PREDICATE_ALIAS_MAP_V0)
+
+
+def normalize_kg_predicate(
+    predicate: object,
+    registry: Optional[SemanticsRegistry] = None,
+) -> Optional[str]:
+    """Normalize a predicate string to its canonical registry id.
+
+    The ingestion-boundary half of the alias design: call this on every
+    extractor-emitted predicate before persisting. The parameter is typed
+    `object` deliberately — sanitizing raw LLM output IS the contract, so
+    non-string input returns None instead of raising.
+
+    Matching contract: input is whitespace-stripped, then matched EXACTLY
+    (case-sensitive — CURIEs are case-sensitive and case-folding would be
+    guessing). The returned id is the stripped form.
+
+    Perf note: `registry=None` loads the registry YAML from disk on EVERY
+    call — in a per-assertion loop, load once and pass it in.
+
+    Returns:
+    - the (stripped) id when it already is a canonical registry predicate id;
+    - the canonical id when the input is a known alias
+      (`KG_PREDICATE_ALIAS_MAP_V0`);
+    - None otherwise — the caller decides (refuse loudly or label unknown);
+      unknown strings are never coerced to a guessed canonical id.
+    """
+    if not isinstance(predicate, str):
+        return None
+    p = predicate.strip()
+    if not p:
+        return None
+    reg = registry or load_semantics_registry()
+    if p in reg.predicate_ids():
+        return p
+    canonical = KG_PREDICATE_ALIAS_MAP_V0.get(p)
+    if canonical is not None and canonical in reg.predicate_ids():
+        return canonical
+    return None
 
 
 def _dedup_preserve_order(values: Sequence[str]) -> list[str]:
@@ -1603,15 +1754,33 @@ def build_kg_assertion_schema_v0(
     """Build the structured-output JSON Schema used by the KG extractor workflows.
 
     This schema is deliberately small and meant to be stable:
-    - `predicate` is restricted to the semantics registry (+ optional aliases).
+    - `predicate` is restricted to the semantics registry (+ optional aliases;
+      only aliases whose canonical target exists in the registry are offered).
     - `subject_type` / `object_type` are restricted to the registry entity types.
     - Evidence fields are bounded (short verbatim snippets).
+
+    Bounds: `max_assertions=0` means unbounded (no `maxItems`); negative
+    bounds are rejected — a negative cap silently becoming "no cap" is the
+    dangerous coercion direction.
     """
     reg = registry or load_semantics_registry()
 
+    if int(max_assertions) < 0 or int(min_assertions_when_nonempty) < 0:
+        raise ValueError("max_assertions and min_assertions_when_nonempty must be >= 0")
+    if int(max_evidence_quote_len) < 0 or int(max_original_context_len) < 0:
+        raise ValueError("evidence length bounds must be >= 0")
+
     predicate_ids: List[str] = [p.id for p in reg.predicates if isinstance(p.id, str) and p.id.strip()]
     if include_predicate_aliases:
-        predicate_ids = list(predicate_ids) + list(KG_PREDICATE_ALIASES_V0)
+        # Offer ONLY aliases whose canonical target exists in THIS registry —
+        # offering a spelling the boundary cannot normalize invites
+        # un-normalizable data (custom/env-override registries may lack some
+        # canonical targets; the accept-side guard in normalize_kg_predicate
+        # has the same check).
+        have = set(predicate_ids)
+        predicate_ids = list(predicate_ids) + [
+            alias for alias, canonical in KG_PREDICATE_ALIAS_MAP_V0.items() if canonical in have
+        ]
     predicate_ids = _dedup_preserve_order(predicate_ids)
 
     entity_type_ids: List[str] = [t.id for t in reg.entity_types if isinstance(t.id, str) and t.id.strip()]
@@ -1715,7 +1884,7 @@ include = ["abstractsemantics*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-abstractsemantics = ["*.yaml", "*.yml"]
+abstractsemantics = ["*.yaml", "*.yml", "py.typed"]
 ```
 ---
 
@@ -1819,6 +1988,59 @@ def test_equivalent_overlap_with_kg_predicates_is_the_declared_set():
         "cito:supports",
         "dcterms:isPartOf",
     }
+
+
+# --- loader robustness (production-readiness wave, 2026-07-13) ---------------
+
+
+def test_loader_names_the_file_on_yaml_syntax_error(tmp_path):
+    """A hand-editing operator's first typo must produce an error naming the
+    FILE — bare PyYAML reports '<unicode string>', which names nothing."""
+    import pytest
+
+    bad = tmp_path / "broken.yaml"
+    bad.write_text("predicates:\n\t- id: x\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="broken.yaml"):
+        load_semantics_registry(bad)
+
+
+def test_loader_enforces_memory_relation_invariants(tmp_path):
+    """memory_relations feed append-only journal writers (declaration IS
+    permission) — structural typos in a custom/override registry must fail
+    LOUD at load, never engrave. Predicates/entity_types keep item-skip
+    leniency (they feed enums and fail soft); this section does not."""
+    import pytest
+
+    base = (
+        "version: 1\n"
+        "predicates:\n"
+        '  - id: "dcterms:title"\n'
+        "entity_types:\n"
+        '  - id: "schema:Thing"\n'
+    )
+
+    curie = tmp_path / "curie.yaml"
+    curie.write_text(
+        base + 'memory_relations:\n  - id: "prov:used"\n    subject_role: a\n    object_role: b\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="plain word"):
+        load_semantics_registry(curie)
+
+    collide = tmp_path / "collide.yaml"
+    collide.write_text(
+        base + 'memory_relations:\n  - id: "title"\n    subject_role: a\n    object_role: b\n'.replace(
+            '"title"', '"dcterms:title"'
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_semantics_registry(collide)
+
+    no_roles = tmp_path / "noroles.yaml"
+    no_roles.write_text(base + 'memory_relations:\n  - id: "summarizes"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="subject_role and object_role"):
+        load_semantics_registry(no_roles)
 ```
 ---
 
@@ -1829,8 +2051,11 @@ from __future__ import annotations
 
 from abstractsemantics import (
     KG_ASSERTION_SCHEMA_REF_V0,
+    KG_PREDICATE_ALIAS_MAP_V0,
+    KG_PREDICATE_ALIASES_V0,
     build_kg_assertion_schema_v0,
     load_semantics_registry,
+    normalize_kg_predicate,
     resolve_schema_ref,
 )
 
@@ -1863,6 +2088,112 @@ def test_resolve_schema_ref_returns_concrete_schema() -> None:
     assert isinstance(resolved, dict)
     assert resolved.get("type") == "object"
     assert "assertions" in resolved.get("properties", {})
+
+
+# --- alias -> canonical normalization (backlog 0002) -------------------------
+
+
+def test_alias_map_range_is_canonical_registry_ids_only() -> None:
+    """The map's RANGE must be canonical registry predicate ids — normalizing
+    to a non-registry string would just mint a third spelling."""
+    reg = load_semantics_registry()
+    ids = reg.predicate_ids()
+    for alias, canonical in KG_PREDICATE_ALIAS_MAP_V0.items():
+        assert canonical in ids, f"alias {alias!r} maps outside the registry: {canonical!r}"
+
+
+def test_alias_map_keys_are_never_registry_ids() -> None:
+    """An alias that IS a registry id would make normalization ambiguous
+    (pass-through vs mapping) — keys and registry ids stay disjoint."""
+    reg = load_semantics_registry()
+    ids = reg.predicate_ids()
+    for alias in KG_PREDICATE_ALIAS_MAP_V0:
+        assert alias not in ids, f"alias {alias!r} is itself a registry id"
+
+
+def test_alias_offer_set_is_derived_from_the_map() -> None:
+    """One source: the offered alias tuple derives from the map's keys — a
+    hand-maintained second copy is the drift class (derive-never-copy)."""
+    assert tuple(KG_PREDICATE_ALIAS_MAP_V0) == tuple(KG_PREDICATE_ALIASES_V0)
+
+
+def test_normalize_passes_canonical_ids_through() -> None:
+    reg = load_semantics_registry()
+    for pid in sorted(reg.predicate_ids()):
+        assert normalize_kg_predicate(pid, reg) == pid
+
+
+def test_normalize_maps_every_offered_alias() -> None:
+    """Round-trip promise: everything the alias-enabled enum can offer, the
+    boundary can normalize — no offered spelling is un-normalizable."""
+    reg = load_semantics_registry()
+    schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+    pred_enum = schema["properties"]["assertions"]["items"]["properties"]["predicate"]["enum"]
+    for offered in pred_enum:
+        normalized = normalize_kg_predicate(offered, reg)
+        assert normalized is not None, f"offered spelling {offered!r} cannot be normalized"
+        assert normalized in reg.predicate_ids()
+
+
+def test_normalize_returns_none_for_unknown_never_guesses() -> None:
+    reg = load_semantics_registry()
+    for unknown in ("schema:hasParent", "schema:hasMemorySource", "made:up", "", "   ", None, 42):
+        assert normalize_kg_predicate(unknown, reg) is None
+
+
+def test_offer_side_filters_aliases_whose_canonical_is_absent(tmp_path) -> None:
+    """Custom registries may lack an alias's canonical target — offering a
+    spelling the boundary cannot normalize invites un-normalizable data, so
+    the enum offers only aliases whose canonical exists in THIS registry
+    (the offer-side twin of normalize's accept-side guard)."""
+    custom = tmp_path / "custom.yaml"
+    custom.write_text(
+        "version: 1\n"
+        "predicates:\n"
+        '  - id: "dcterms:creator"\n'
+        "entity_types:\n"
+        '  - id: "schema:Thing"\n',
+        encoding="utf-8",
+    )
+    reg = load_semantics_registry(custom)
+    schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+    enum = schema["properties"]["assertions"]["items"]["properties"]["predicate"]["enum"]
+    assert "schema:creator" in enum  # canonical dcterms:creator present
+    assert "schema:hasPart" not in enum  # canonical dcterms:hasPart absent
+    for offered in enum:
+        assert normalize_kg_predicate(offered, reg) is not None
+
+
+def test_negative_bounds_are_rejected() -> None:
+    """A negative cap silently becoming 'no cap' is the dangerous coercion
+    direction; negative maxLength is invalid JSON Schema."""
+    import pytest
+
+    with pytest.raises(ValueError):
+        build_kg_assertion_schema_v0(max_assertions=-1)
+    with pytest.raises(ValueError):
+        build_kg_assertion_schema_v0(max_evidence_quote_len=-7)
+
+
+def test_alias_map_stays_disjoint_from_memory_relations() -> None:
+    """Memory-relation plain words must never enter the KG alias vocabulary
+    (semantics.yaml: memory words never surface in the KG enum) — a future
+    map entry like "summarizes": "dcterms:abstract" would pass the range
+    check while leaking the vocabulary; this pin makes it a decision, not
+    drift. Belt: every memory word returns None from the normalizer."""
+    reg = load_semantics_registry()
+    assert set(KG_PREDICATE_ALIAS_MAP_V0) & reg.memory_relation_ids() == set()
+    for word in sorted(reg.memory_relation_ids()):
+        assert normalize_kg_predicate(word, reg) is None
+
+
+def test_indeterminate_aliases_are_not_offered() -> None:
+    """Aliases without a determinate canonical mapping were deliberately
+    removed from the offer set (offering what the boundary cannot normalize
+    invites un-normalizable data at rest)."""
+    for dropped in ("schema:hasParent", "schema:hasMember", "schema:recognizedAs", "schema:hasMemorySource"):
+        assert dropped not in KG_PREDICATE_ALIASES_V0
+        assert dropped not in KG_PREDICATE_ALIAS_MAP_V0
 ```
 ---
 
@@ -1872,7 +2203,7 @@ def test_resolve_schema_ref_returns_concrete_schema() -> None:
 
 All notable changes to this package are documented in this file.
 
-## [0.0.5] - 2026-07-10 (amended 2026-07-12)
+## [0.0.5] - 2026-07-10 (amended 2026-07-12, 2026-07-13)
 
 ### Added
 
@@ -1906,6 +2237,42 @@ All notable changes to this package are documented in this file.
   `confirm_relation`) validate direction against these instead of
   hardcoding a second copy of the semantics. Test-pinned: every entry must
   carry both roles.
+- **Production-readiness hardening (2026-07-13, whole-package fable5 audit)**:
+  loader errors now NAME THE FILE on YAML syntax errors (bare PyYAML reports
+  `<unicode string>` — useless to a hand-editing operator); `memory_relations`
+  structural invariants are enforced at LOAD time for any registry, custom
+  and override included (plain-word id, disjoint from KG predicate ids, both
+  direction roles present — this section feeds append-only journal writers,
+  so a config typo must fail loud, never engrave; predicates/entity_types
+  keep item-skip leniency since they feed enums and fail soft); the alias
+  OFFER side now filters to aliases whose canonical target exists in the
+  given registry (custom registries could previously be offered spellings
+  the boundary then refused — the offer/accept round-trip now holds for
+  every registry, not just the shipped one); negative schema bounds are
+  rejected (a negative cap silently becoming "no cap" was the dangerous
+  coercion direction; negative `maxLength` is invalid JSON Schema);
+  `ABSTRACTSEMANTICS_REGISTRY_PATH` pointing at a directory now fails with
+  an actionable message; `py.typed` marker added (the package was fully
+  annotated but PEP 561-invisible — typed consumers saw `Any`). Tests
+  18 → 22. Follow-up batch recorded (docs/backlog): duplicate-key detection,
+  skip-count warnings, version-parse warning, duplicate-id keep-first.
+- **KG predicate alias normalization (2026-07-13, backlog 0002)**:
+  `KG_PREDICATE_ALIAS_MAP_V0` (alias → canonical registry id) and
+  `normalize_kg_predicate()` — the ingestion-boundary verb that passes
+  canonical ids through (whitespace-stripped, exact case-sensitive match),
+  maps known aliases, and returns `None` for anything else (caller refuses
+  or labels; never guesses; non-string input returns `None` by contract).
+  Both exported at package top level. `KG_PREDICATE_ALIASES_V0` now DERIVES
+  from the map's keys (derive-never-copy, test-pinned) and was NARROWED to
+  determinate aliases only: `schema:hasParent`, `schema:hasMember`,
+  `schema:recognizedAs`, `schema:hasMemorySource` removed from the offer
+  set (context-dependent, unmapped, lossy, or invented — offering a
+  spelling the boundary cannot normalize invites un-normalizable data at
+  rest). Verified: no framework consumer enables
+  `include_predicate_aliases=True`, so the narrowing has zero blast radius.
+  Pins: offered-set round trip (every enum spelling normalizes), map range
+  ⊆ registry ids, map keys disjoint from BOTH registry ids and
+  memory-relation words (the vocabulary-leak guard).
 
 ### Notes
 

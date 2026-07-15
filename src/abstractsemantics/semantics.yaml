@@ -234,6 +234,12 @@ memory_relations:
     subject_role: "part"
     object_role: "whole"
 
+# NAMING NOTE (disambiguation): "entity_types" here = NER-sense classes for
+# KG extraction (what kind of thing a knowledge-graph node is: person, place,
+# concept...). This is UNRELATED to the framework's SUMMONED ENTITIES
+# (named persistent identities with homes/phases) — that vocabulary lives in
+# the gateway/runtime lanes; the maintainer's preferred term there is
+# "summoned entity" precisely because "named entity" collides with NER here.
 entity_types:
   # Generic "real-world thing" catch-all (includes physical objects).
   - id: "schema:Thing"

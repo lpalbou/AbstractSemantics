@@ -2,7 +2,7 @@
 
 All notable changes to this package are documented in this file.
 
-## [0.0.5] - 2026-07-10 (amended 2026-07-12)
+## [0.0.5] - 2026-07-10 (amended 2026-07-12, 2026-07-13)
 
 ### Added
 
@@ -36,6 +36,42 @@ All notable changes to this package are documented in this file.
   `confirm_relation`) validate direction against these instead of
   hardcoding a second copy of the semantics. Test-pinned: every entry must
   carry both roles.
+- **Production-readiness hardening (2026-07-13, whole-package fable5 audit)**:
+  loader errors now NAME THE FILE on YAML syntax errors (bare PyYAML reports
+  `<unicode string>` — useless to a hand-editing operator); `memory_relations`
+  structural invariants are enforced at LOAD time for any registry, custom
+  and override included (plain-word id, disjoint from KG predicate ids, both
+  direction roles present — this section feeds append-only journal writers,
+  so a config typo must fail loud, never engrave; predicates/entity_types
+  keep item-skip leniency since they feed enums and fail soft); the alias
+  OFFER side now filters to aliases whose canonical target exists in the
+  given registry (custom registries could previously be offered spellings
+  the boundary then refused — the offer/accept round-trip now holds for
+  every registry, not just the shipped one); negative schema bounds are
+  rejected (a negative cap silently becoming "no cap" was the dangerous
+  coercion direction; negative `maxLength` is invalid JSON Schema);
+  `ABSTRACTSEMANTICS_REGISTRY_PATH` pointing at a directory now fails with
+  an actionable message; `py.typed` marker added (the package was fully
+  annotated but PEP 561-invisible — typed consumers saw `Any`). Tests
+  18 → 22. Follow-up batch recorded (docs/backlog): duplicate-key detection,
+  skip-count warnings, version-parse warning, duplicate-id keep-first.
+- **KG predicate alias normalization (2026-07-13, backlog 0002)**:
+  `KG_PREDICATE_ALIAS_MAP_V0` (alias → canonical registry id) and
+  `normalize_kg_predicate()` — the ingestion-boundary verb that passes
+  canonical ids through (whitespace-stripped, exact case-sensitive match),
+  maps known aliases, and returns `None` for anything else (caller refuses
+  or labels; never guesses; non-string input returns `None` by contract).
+  Both exported at package top level. `KG_PREDICATE_ALIASES_V0` now DERIVES
+  from the map's keys (derive-never-copy, test-pinned) and was NARROWED to
+  determinate aliases only: `schema:hasParent`, `schema:hasMember`,
+  `schema:recognizedAs`, `schema:hasMemorySource` removed from the offer
+  set (context-dependent, unmapped, lossy, or invented — offering a
+  spelling the boundary cannot normalize invites un-normalizable data at
+  rest). Verified: no framework consumer enables
+  `include_predicate_aliases=True`, so the narrowing has zero blast radius.
+  Pins: offered-set round trip (every enum spelling normalizes), map range
+  ⊆ registry ids, map keys disjoint from BOTH registry ids and
+  memory-relation words (the vocabulary-leak guard).
 
 ### Notes
 

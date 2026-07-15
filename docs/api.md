@@ -40,6 +40,8 @@ print(first.id, first.label)
 - `KG_ASSERTION_SCHEMA_REF_V0: str`
 - `build_kg_assertion_schema_v0(...) -> dict`
   - important args: `include_predicate_aliases`, `max_assertions`, `min_assertions_when_nonempty`
+- `normalize_kg_predicate(predicate, registry=None) -> str | None`: ingestion-boundary normalization — canonical ids pass through, known aliases map to canonical (`KG_PREDICATE_ALIAS_MAP_V0`), anything else returns `None` (caller refuses or labels; never guesses)
+- `KG_PREDICATE_ALIAS_MAP_V0: dict[str, str]`: alias → canonical registry id (single source; the offered `KG_PREDICATE_ALIASES_V0` tuple derives from its keys)
 - `resolve_schema_ref(schema: dict) -> dict | None`
 
 ### Evidence (tests)

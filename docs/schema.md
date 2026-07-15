@@ -41,7 +41,7 @@ schema = build_kg_assertion_schema_v0(
 
 `build_kg_assertion_schema_v0()`:
 
-- restricts `predicate` to `registry.predicates[*].id` (and optionally a small alias list: `KG_PREDICATE_ALIASES_V0`)
+- restricts `predicate` to `registry.predicates[*].id` (and optionally a small alias list: `KG_PREDICATE_ALIASES_V0`, derived from the keys of the alias→canonical map `KG_PREDICATE_ALIAS_MAP_V0`)
 - restricts `attributes.subject_type` and `attributes.object_type` to `registry.entity_types[*].id`
 - requires each assertion to include:
   - `subject`, `predicate`, `object`
@@ -52,6 +52,31 @@ schema = build_kg_assertion_schema_v0(
   - if `min_assertions_when_nonempty > 0`, the schema allows either an empty list OR at least N assertions (an `anyOf` guard)
 
 If the registry has no predicate ids or no entity-type ids, it raises `ValueError`.
+
+## Normalizing aliases at the ingestion boundary
+
+If you enable `include_predicate_aliases=True`, normalize every
+extractor-emitted predicate before persisting (one spelling per predicate at
+rest):
+
+```python
+from abstractsemantics import load_semantics_registry, normalize_kg_predicate
+
+reg = load_semantics_registry()  # load ONCE — registry=None re-reads the YAML per call
+for assertion in assertions:
+    canonical = normalize_kg_predicate(assertion["predicate"], reg)
+    if canonical is None:
+        ...  # refuse loudly or store as labeled-unknown — never guess a meaning
+    else:
+        assertion["predicate"] = canonical
+```
+
+`normalize_kg_predicate()` passes canonical registry ids through, maps known
+aliases via `KG_PREDICATE_ALIAS_MAP_V0`, and returns `None` for everything
+else. Matching is whitespace-stripped then exact (case-sensitive — CURIEs
+are case-sensitive; folding would guess). Only aliases with a determinate
+canonical mapping are offered in the enum, so every offered spelling is
+guaranteed normalizable (test-pinned round trip).
 
 ## Schema shape (high level)
 
