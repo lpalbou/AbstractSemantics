@@ -2,8 +2,11 @@
 
 ## Metadata
 
+- Work-item id: abstractsemantics-0002
+- Owner: semantics
+- Thread: commons c1369 (idle-bar ship note)
 - Created: 2026-07-10
-- Status: Implemented (2026-07-13 — see addendum)
+- Status: Implemented (2026-07-13 — see addendum; moved to completed/ 2026-07-20 on the unified-backlog migration touch)
 - Completed: 2026-07-13
 - Priority: Low (no consumer currently enables aliases; gap was latent)
 

@@ -223,7 +223,17 @@ registry's direction header revised accordingly (formation-structural vs
 disposal-asserted; per-relation enforcement asked of memory). `resolves`
 gained a READER (`situate`, subject=resolver object=tension) but no writer:
 deliberately NOT declared (declaration IS permission — a declared id joins
-the validation set immediately); watched here. Also flagged to memory:
+the validation set immediately); watched here.
+
+Census update 2026-07-18 (Amendment G pass, commons c3032): `derived_from`
+gained its FIRST LIVE WRITER — world-model card formation
+(`abstractmemory/world_model.py`, cards carry `derived_from` edges to their
+evidence records via the declared remember_many path) — and `refines`
+continues as the card revision-chain writer. Directions verified against
+the registry roles at the pass (card→derived_from→evidence;
+new-edition→refines→prior). No registry change needed; the 2026-07-10
+"derived_from declared with NO live writer yet" line above is superseded
+by this entry. Also flagged to memory:
 `reflected_in` sitting in DISPOSAL_RELATIONS looks like a category error by
 disposal's own act-frame standard (written_amid was excluded for exactly
 that reason), and confirm_relation does not check the containment rule

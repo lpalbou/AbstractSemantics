@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -107,15 +108,72 @@ def _as_list(value: Any) -> list:
     return list(value) if isinstance(value, list) else []
 
 
+class _StrictKeyLoader(yaml.SafeLoader):
+    """SafeLoader that REFUSES duplicate mapping keys (backlog 0003 item 1).
+
+    PyYAML deliberately does not enforce YAML's unique-key rule: a stray
+    pasted second `predicates:` block silently last-wins and can replace the
+    whole vocabulary without a sound. For a registry an operator hand-edits,
+    that silence is the defect — fail loudly at load instead.
+    """
+
+
+def _strict_mapping(loader: _StrictKeyLoader, node: yaml.nodes.MappingNode, deep: bool = False):
+    seen: set = set()
+    for key_node, _value_node in node.value:
+        # Merge keys (`<<:`) are handled by flatten_mapping inside
+        # construct_mapping below; constructing the merge-tag key node here
+        # would raise (SafeConstructor has no merge constructor) and refuse
+        # valid YAML the old loader accepted. Skip them in the dup scan.
+        if key_node.tag == "tag:yaml.org,2002:merge":
+            continue
+        key = loader.construct_object(key_node, deep=deep)
+        # Unhashable keys (lists/dicts) are a YAML error PyYAML raises on its
+        # own; only guard hashable duplicates here.
+        try:
+            duplicate = key in seen
+        except TypeError:
+            continue
+        if duplicate:
+            raise ValueError(
+                f"duplicate mapping key {key!r} (line {key_node.start_mark.line + 1})"
+            )
+        seen.add(key)
+    return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
+
+
+_StrictKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _strict_mapping
+)
+
+
 def _load_yaml(path: Path) -> Dict[str, Any]:
     raw = path.read_text(encoding="utf-8")
     try:
-        data = yaml.safe_load(raw)
+        data = yaml.load(raw, Loader=_StrictKeyLoader)
     except yaml.YAMLError as e:
         # PyYAML parses the string and reports '<unicode string>' — the
         # operator hand-editing a registry needs the FILE named.
         raise ValueError(f"Invalid YAML in semantics registry {path}: {e}") from e
+    except ValueError as e:
+        # Duplicate-key refusal from the strict loader: name the file too.
+        raise ValueError(f"Invalid YAML in semantics registry {path}: {e}") from e
     return data if isinstance(data, dict) else {}
+
+
+def _warn_skips(path: Path, section: str, skipped: int) -> None:
+    """ONE warning per section naming path + count (backlog 0003 item 2).
+
+    Item-skip LENIENCY is deliberate for predicates/entity_types (they feed
+    enums and fail soft) — but a wrong-indent typo that silently vanishes a
+    predicate used to surface only as a distant extractor-enum gap. The load
+    succeeds; the operator gets a sound."""
+    if skipped:
+        warnings.warn(
+            f"semantics registry {path}: skipped {skipped} malformed item(s) in "
+            f"'{section}' (each must be a mapping with a non-empty string 'id')",
+            stacklevel=3,
+        )
 
 
 def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
@@ -123,9 +181,19 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
     data = _load_yaml(p)
 
     version_raw = data.get("version", 0)
+    if version_raw is None:
+        # A bare `version:` (explicit null) is absent-shaped, not corrupt —
+        # a common hand-edit intermediate; stays quiet like a missing key.
+        version_raw = 0
     try:
         version = int(version_raw)
     except Exception:
+        # Backlog 0003 item 3: unparseable is DISTINCT from absent — absent
+        # defaults quietly, corruption gets a sound (both read as 0).
+        warnings.warn(
+            f"semantics registry {p}: unparseable version {version_raw!r} — reading as 0",
+            stacklevel=2,
+        )
         version = 0
 
     prefixes_raw = data.get("prefixes")
@@ -136,11 +204,14 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
                 prefixes[k.strip()] = v.strip()
 
     predicates: list[PredicateDef] = []
+    skipped = 0
     for item in _as_list(data.get("predicates")):
         if not isinstance(item, dict):
+            skipped += 1
             continue
         pid = item.get("id")
         if not isinstance(pid, str) or not pid.strip():
+            skipped += 1
             continue
         predicates.append(
             PredicateDef(
@@ -150,13 +221,17 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
                 description=item.get("description") if isinstance(item.get("description"), str) else None,
             )
         )
+    _warn_skips(p, "predicates", skipped)
 
     entity_types: list[EntityTypeDef] = []
+    skipped = 0
     for item in _as_list(data.get("entity_types")):
         if not isinstance(item, dict):
+            skipped += 1
             continue
         tid = item.get("id")
         if not isinstance(tid, str) or not tid.strip():
+            skipped += 1
             continue
         entity_types.append(
             EntityTypeDef(
@@ -166,13 +241,17 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
                 description=item.get("description") if isinstance(item.get("description"), str) else None,
             )
         )
+    _warn_skips(p, "entity_types", skipped)
 
     memory_relations: list[MemoryRelationDef] = []
+    skipped = 0
     for item in _as_list(data.get("memory_relations")):
         if not isinstance(item, dict):
+            skipped += 1
             continue
         rid = item.get("id")
         if not isinstance(rid, str) or not rid.strip():
+            skipped += 1
             continue
         equivalent_raw = item.get("equivalent")
         equivalent = tuple(
@@ -189,6 +268,45 @@ def load_semantics_registry(path: Path | None = None) -> SemanticsRegistry:
                 subject_role=item.get("subject_role") if isinstance(item.get("subject_role"), str) else None,
                 object_role=item.get("object_role") if isinstance(item.get("object_role"), str) else None,
             )
+        )
+    _warn_skips(p, "memory_relations", skipped)
+
+    # Backlog 0003 item 4: duplicate ids within a section keep FIRST + warn.
+    # Set-based consumers were always safe; iterating consumers (enum
+    # builders, UI dropdowns) saw both rows and label-wins became
+    # consumer-dependent — keep-first makes the winner deterministic.
+    def _dedupe(defs, section: str):
+        seen: set = set()
+        out = []
+        dups = []
+        for d in defs:
+            if d.id in seen:
+                dups.append(d.id)
+                continue
+            seen.add(d.id)
+            out.append(d)
+        if dups:
+            warnings.warn(
+                f"semantics registry {p}: duplicate id(s) in '{section}' — "
+                f"keeping the first occurrence of: {sorted(set(dups))}",
+                stacklevel=3,
+            )
+        return out
+
+    predicates = _dedupe(predicates, "predicates")
+    entity_types = _dedupe(entity_types, "entity_types")
+
+    # memory_relations duplicates are FATAL, not keep-first: this section is
+    # load-fatal by doctrine (declaration IS permission), and keep-first would
+    # silently decide which of two conflicting role declarations is
+    # authoritative — an order-dependent leniency worse than either choice
+    # (adversarial finding 2, 2026-07-20).
+    rel_ids = [r.id for r in memory_relations]
+    rel_dups = sorted({rid for rid in rel_ids if rel_ids.count(rid) > 1})
+    if rel_dups:
+        raise ValueError(
+            f"Semantics registry {p}: duplicate memory relation id(s) {rel_dups} — "
+            f"this section is load-fatal; remove the duplicate declaration(s)"
         )
 
     if not predicates:

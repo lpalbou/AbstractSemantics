@@ -2,6 +2,29 @@
 
 All notable changes to this package are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Loader diagnostics batch (2026-07-20, backlog 0003)**: four
+  operator-typo classes that silently degraded now make a sound. (1)
+  Duplicate YAML mapping keys REFUSE loudly at load (a stray pasted second
+  `predicates:` block used to last-win and replace the whole vocabulary
+  silently) via a loader-local `SafeLoader` subclass — YAML merge keys
+  (`<<:`) remain accepted (adversarial regression pin). (2) Malformed
+  section items (non-dict or id-less) emit ONE warning per section naming
+  the file and count; the load still succeeds (enum-feeding sections keep
+  their deliberate fail-soft leniency). (3) An unparseable `version` (e.g.
+  `"abc"`) warns while reading 0 — distinct from absent or explicit-null,
+  which stay quiet. (4) Duplicate ids within `predicates`/`entity_types`
+  keep the FIRST occurrence with a warning (deterministic winner for
+  iterating consumers); duplicate `memory_relations` ids are FATAL — that
+  section is load-fatal by doctrine, and keep-first would let a broken or
+  conflicting second declaration demote a hard failure to a warning
+  (adversarial finding). Valid files load byte-identically with zero
+  warnings — pinned by a `simplefilter("error")` test on the shipped
+  registry. Tests 22 → 30.
+
 ## [0.0.5] - 2026-07-10 (amended 2026-07-12, 2026-07-13)
 
 ### Added
