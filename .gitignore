@@ -191,3 +191,11 @@ TODO.md
 
 untracked/
 test_results/
+
+# Machine-local agent-harness wiring (absolute binary paths, local hub URLs,
+# per-machine API keys). The shareable conventions stay tracked:
+# .cursor/rules/ and .cursor/hooks/.
+.agora/
+.abstractcode/
+.cursor/mcp.json
+.cursor/hooks.json

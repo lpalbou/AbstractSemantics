@@ -8,18 +8,22 @@
 - [Getting started](getting-started.md): install, load registry, build schema, `$ref` resolution
 - [API reference](api.md): public API surface (what `abstractsemantics.__init__` exports)
 - [Architecture](architecture.md): components, data flow, and diagrams
-- [Registry format](registry.md): YAML shape and loader behavior
+- [Registry format](registry.md): YAML shape, section rules, and loader behavior
 - [KG assertion JSON Schema](schema.md): schema builder and `$ref` resolver
-- [FAQ](faq.md): common questions and troubleshooting
+- [FAQ](faq.md): common questions and design boundaries
+- [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes
 - [Development](development.md): tests, builds, release checklist
 
 ## I want to…
 
 - **Load the default registry** or override it with `ABSTRACTSEMANTICS_REGISTRY_PATH`: see [Getting started](getting-started.md).
 - **Edit/extend the YAML registry** (ids, labels, inverses, parents): see [Registry format](registry.md).
+- **Use the memory-relation vocabulary** (plain-word edge ids and their direction roles): see [Registry format](registry.md) and [Getting started](getting-started.md).
 - **Build a bounded “KG assertion” JSON Schema** for structured outputs: see [KG assertion JSON Schema](schema.md).
+- **Normalize an extractor-emitted predicate** before persisting it: see [Getting started](getting-started.md) and [API reference](api.md).
 - **Resolve a stable `$ref`** like `abstractsemantics:kg_assertion_schema_v0`: see [Getting started](getting-started.md) and [KG assertion JSON Schema](schema.md).
 - **Understand how this fits in AbstractFramework** (and what it does *not* do): see [Architecture](architecture.md).
+- **Fix a registry that will not load**: see [Troubleshooting](troubleshooting.md).
 
 ## AbstractFramework ecosystem
 
@@ -35,8 +39,9 @@ This repo ships the definitions (registry ids) and a schema helper; integration 
 
 - [Changelog](../CHANGELOG.md)
 - [Contributing](../CONTRIBUTING.md)
+- [Code of conduct](../CODE_OF_CONDUCT.md)
 - [Security policy](../SECURITY.md)
-- [Acknowledgments](../ACKNOWLEDMENTS.md)
+- [Acknowledgments](../ACKNOWLEDGMENTS.md)
 - [License](../LICENSE)
 
 ## Source of truth (code)

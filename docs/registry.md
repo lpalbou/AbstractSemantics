@@ -69,60 +69,67 @@ Each item under `memory_relations` becomes a `MemoryRelationDef` dataclass insta
 - `description` (optional): string
 - `equivalent` (optional): list of standard-ontology CURIEs (equal-or-broader terms) carried as export/interop metadata only
 
-This vocabulary is the declared edge-relation set for AbstractMemory's typed
-memory records (decision `0016-vocabulary-direction`, 2026-07-10; widened
-2026-07-12 with `refines`, `answers`, `supports`, `part_of` when their
-writers shipped). Design rules, in force:
+- `subject_role` (required): short noun naming the subject endpoint (e.g. `evidence`)
+- `object_role` (required): short noun naming the object endpoint (e.g. `claim`)
 
-- **Plain words are the canonical at-rest spelling.** Memory journals are
-  append-only and equality-key predicate strings with no alias resolution at
-  read, so an engraved word can never be renamed. `equivalent` CURIEs are
-  hints for export/interop — never a second at-rest spelling.
+This vocabulary is the declared edge-relation set for AbstractMemory's typed
+memory records. The rules below govern it:
+
+- **Plain words are the canonical spelling at rest.** Memory journals are
+  append-only and match predicate strings exactly, with no alias resolution
+  at read time, so a recorded word can never be renamed. `equivalent` CURIEs
+  are hints for export and interop — never a second spelling at rest.
 - **Equivalents are many-to-one and lossy.** Several plain words may share
-  one broader CURIE (`summarizes`/`from_session`/`derived_from` all
-  specialize `prov:wasDerivedFrom`); the mapping is never reversible and
-  must never drive an import back to plain words (memory fidelity review,
-  2026-07-10).
+  one broader CURIE (`summarizes`, `from_session`, and `derived_from` all
+  specialize `prov:wasDerivedFrom`). The mapping is not reversible and must
+  not be used to import back to plain words.
+- **One most-specific equivalent per entry.** `refines` lists
+  `prov:wasRevisionOf` alone and not its superproperty `prov:wasDerivedFrom`,
+  which a PROV-aware importer infers.
 - **Disjoint from `predicates`.** The `predicates` list feeds the
-  KG-extraction structured-output enum; memory relations must never appear
-  there (test-pinned).
-- **Append-widen only, coordinated.** No new relation is engraved by
-  AbstractMemory before it is declared here, and nothing is added here
-  without coordinating with the memory seat. Ids are never renamed or
-  removed. Declaration IS permission: a declared id immediately joins the
-  validation set, so anticipated-but-writerless words (e.g. `resolves`,
-  which has a reader in `situate` but no writer) stay out until their
-  writer ships.
-- **Direction convention (revised 2026-07-12).** Each entry's description
-  defines the authoritative direction. For formation-time writers,
-  subject = the newly formed record (structural). Disposal-confirmed edges
-  (`confirm_relation`) carry caller-asserted endpoints that must match the
-  description's direction — enforcement lives with the memory engine.
-- **Equivalence policy: one most-specific term.** `refines` lists
-  `prov:wasRevisionOf` alone, never also its superproperty
-  `prov:wasDerivedFrom` — a PROV-aware importer infers the broader term.
-  The known overlap between `equivalent` CURIEs and KG predicate ids
-  (`schema:mentions`, `schema:previousItem`, `cito:supports`,
-  `dcterms:isPartOf`) is declared and test-pinned; safe because validation
+  KG-extraction structured-output enum, and memory relations must never
+  appear there. Some `equivalent` CURIEs (`schema:mentions`,
+  `schema:previousItem`, `cito:supports`, `dcterms:isPartOf`) do also exist
+  as `predicates` ids — that is intentional and safe, because validation
   accepts only plain-word ids and `equivalent` is export-only.
-- **Validation set.** `SemanticsRegistry.memory_record_predicate_ids()`
-  returns the declared relation ids plus the digest predicate
-  (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`) — the set AbstractMemory's
-  vocabulary validation checks NEW record writes against.
-- **Authority boundary (settled with the memory seat, 2026-07-10).** The
-  registry owns AT-REST PREDICATE vocabulary (this section, per the 0016
-  ruling). Engine validation vocabularies — AbstractMemory's record-kind set
-  and `diary_type` closed set — stay engine-owned and are package-root
-  exports of `abstractmemory` (`MEMORY_RECORD_KINDS`, `DIARY_TYPES`,
-  `KIND_RANKS`): consumers import the owning set rather than copying it. A
-  registry declaration of those sets would create a second authority that
-  could disagree with the refusing code — the drift class one level up.
-  The same boundary covers writer-owned closed sets this seat merely
-  DESIGNED (designed-here ≠ owned-here): the entity phase keys
-  (visit/work/personal/sleep), the `phase_changed` marker cause set, and the
-  `phases.yaml` mode enum (`disabled|timer|until_revoked`) are owned by
-  their writer packages (gateway/runtime) — they must never be filed into
-  this registry either.
+- **Additive only.** Ids are never renamed or removed, because journals
+  record them permanently. Declaring a relation grants permission to write
+  it: a declared id immediately joins the validation set, so a word is
+  declared when its writer ships, not in anticipation.
+- **Each description defines the authoritative direction**, and
+  `subject_role`/`object_role` carry it in machine-readable form. For
+  formation-time writers, the subject is the newly formed record. Writers
+  that accept caller-asserted endpoints validate them against the declared
+  roles.
+- **The validation set** is `SemanticsRegistry.memory_record_predicate_ids()`:
+  the declared relation ids plus the digest predicate
+  (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`). Memory-record writes are
+  checked against it.
+
+### Validation
+
+Unlike `predicates` and `entity_types`, this section is validated strictly:
+a malformed entry raises instead of being skipped, because a declared
+relation is written into append-only storage where a typo cannot be undone.
+The load fails when a relation:
+
+- has an id containing a `:` (ids must be plain words);
+- has an id that is also a `predicates` id;
+- omits `subject_role` or `object_role`;
+- is declared more than once.
+
+These rules apply to every registry, including one supplied through
+`ABSTRACTSEMANTICS_REGISTRY_PATH`. See [Troubleshooting](troubleshooting.md)
+for the exact messages.
+
+### Scope boundary
+
+This registry owns the at-rest **predicate** vocabulary. It deliberately does
+not declare closed sets that belong to the packages that write them —
+AbstractMemory's record-kind and `diary_type` sets, or the entity phase keys
+and mode enums owned by the gateway and runtime. Import those from their
+owning package rather than copying them here, so there is only ever one
+authority for each set.
 
 ## Minimal example
 

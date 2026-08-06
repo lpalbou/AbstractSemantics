@@ -2,123 +2,92 @@
 
 All notable changes to this package are documented in this file.
 
-## [Unreleased]
+## [0.0.5] - 2026-08-06
 
 ### Added
 
-- **Loader diagnostics batch (2026-07-20, backlog 0003)**: four
-  operator-typo classes that silently degraded now make a sound. (1)
-  Duplicate YAML mapping keys REFUSE loudly at load (a stray pasted second
-  `predicates:` block used to last-win and replace the whole vocabulary
-  silently) via a loader-local `SafeLoader` subclass — YAML merge keys
-  (`<<:`) remain accepted (adversarial regression pin). (2) Malformed
-  section items (non-dict or id-less) emit ONE warning per section naming
-  the file and count; the load still succeeds (enum-feeding sections keep
-  their deliberate fail-soft leniency). (3) An unparseable `version` (e.g.
-  `"abc"`) warns while reading 0 — distinct from absent or explicit-null,
-  which stay quiet. (4) Duplicate ids within `predicates`/`entity_types`
-  keep the FIRST occurrence with a warning (deterministic winner for
-  iterating consumers); duplicate `memory_relations` ids are FATAL — that
-  section is load-fatal by doctrine, and keep-first would let a broken or
-  conflicting second declaration demote a hard failure to a warning
-  (adversarial finding). Valid files load byte-identically with zero
-  warnings — pinned by a `simplefilter("error")` test on the shipped
-  registry. Tests 22 → 30.
-
-## [0.0.5] - 2026-07-10 (amended 2026-07-12, 2026-07-13)
-
-### Added
-
-- Declared the AbstractMemory typed-record edge vocabulary as a new
-  `memory_relations` registry section (`summarizes`, `mentions`,
+- **`memory_relations` registry section.** A third vocabulary alongside
+  `predicates` and `entity_types`, describing the edge relations used by
+  AbstractMemory's typed memory records: `summarizes`, `mentions`,
   `written_amid`, `from_session`, `reflected_in`, `continues`,
-  `derived_from`) per decision `0016-vocabulary-direction` (2026-07-10):
-  plain words are the canonical at-rest spelling; standard-ontology CURIEs
-  ride each entry's `equivalent` list as export/interop metadata only.
-- New `MemoryRelationDef` dataclass, `SemanticsRegistry.memory_relation_ids()`,
-  `SemanticsRegistry.memory_record_predicate_ids()` (the AbstractMemory
-  validation set: declared relations + digest predicate), and the
-  `MEMORY_DIGEST_PREDICATE` constant (`"dcterms:abstract"`).
-- Declared the `prov` prefix (PROV-O) for equivalence metadata.
-- Registry `version` bumped to 1.
-- **Widening batch (2026-07-12, coordinated with the memory seat per the
-  standing rule)**: four relations join `memory_relations` — `refines`
-  (`prov:wasRevisionOf`; live writer: world-model revision chains),
-  `answers` (`cito:repliesTo`; the edge form — distinct from the
-  `attributes.answers` reference on diary entries), `supports`
-  (`cito:supports`; subject = the evidence, object = the claim supported),
-  and `part_of` (`dcterms:isPartOf`). The latter three gained a writer path
-  through memory's disposal surface (`confirm_relation`). Registry `version`
-  bumped to 2. `resolves` is deliberately NOT declared (reader-only today;
-  declaration IS permission in this design — it follows the widening rule
-  when memory ships its writer).
-- **Machine-readable direction (2026-07-12, memory's ask)**: every
-  `memory_relations` entry now declares `subject_role`/`object_role` (short
-  role nouns, e.g. `supports`: evidence → claim), carried on
-  `MemoryRelationDef`. Writers with caller-asserted endpoints (disposal
-  `confirm_relation`) validate direction against these instead of
-  hardcoding a second copy of the semantics. Test-pinned: every entry must
-  carry both roles.
-- **Production-readiness hardening (2026-07-13, whole-package fable5 audit)**:
-  loader errors now NAME THE FILE on YAML syntax errors (bare PyYAML reports
-  `<unicode string>` — useless to a hand-editing operator); `memory_relations`
-  structural invariants are enforced at LOAD time for any registry, custom
-  and override included (plain-word id, disjoint from KG predicate ids, both
-  direction roles present — this section feeds append-only journal writers,
-  so a config typo must fail loud, never engrave; predicates/entity_types
-  keep item-skip leniency since they feed enums and fail soft); the alias
-  OFFER side now filters to aliases whose canonical target exists in the
-  given registry (custom registries could previously be offered spellings
-  the boundary then refused — the offer/accept round-trip now holds for
-  every registry, not just the shipped one); negative schema bounds are
-  rejected (a negative cap silently becoming "no cap" was the dangerous
-  coercion direction; negative `maxLength` is invalid JSON Schema);
-  `ABSTRACTSEMANTICS_REGISTRY_PATH` pointing at a directory now fails with
-  an actionable message; `py.typed` marker added (the package was fully
-  annotated but PEP 561-invisible — typed consumers saw `Any`). Tests
-  18 → 22. Follow-up batch recorded (docs/backlog): duplicate-key detection,
-  skip-count warnings, version-parse warning, duplicate-id keep-first.
-- **KG predicate alias normalization (2026-07-13, backlog 0002)**:
-  `KG_PREDICATE_ALIAS_MAP_V0` (alias → canonical registry id) and
-  `normalize_kg_predicate()` — the ingestion-boundary verb that passes
-  canonical ids through (whitespace-stripped, exact case-sensitive match),
-  maps known aliases, and returns `None` for anything else (caller refuses
-  or labels; never guesses; non-string input returns `None` by contract).
-  Both exported at package top level. `KG_PREDICATE_ALIASES_V0` now DERIVES
-  from the map's keys (derive-never-copy, test-pinned) and was NARROWED to
-  determinate aliases only: `schema:hasParent`, `schema:hasMember`,
-  `schema:recognizedAs`, `schema:hasMemorySource` removed from the offer
-  set (context-dependent, unmapped, lossy, or invented — offering a
-  spelling the boundary cannot normalize invites un-normalizable data at
-  rest). Verified: no framework consumer enables
-  `include_predicate_aliases=True`, so the narrowing has zero blast radius.
-  Pins: offered-set round trip (every enum spelling normalizes), map range
-  ⊆ registry ids, map keys disjoint from BOTH registry ids and
-  memory-relation words (the vocabulary-leak guard).
+  `derived_from`, `refines`, `answers`, `supports`, and `part_of`. Ids are
+  plain words, which are the canonical spelling at rest. Each entry carries
+  an optional `equivalent` list of standard-ontology CURIEs for export and
+  interop, and `subject_role`/`object_role` naming each endpoint so writers
+  can validate edge direction from the registry instead of duplicating the
+  semantics.
+- **New public API**: `MemoryRelationDef`, the `SemanticsRegistry.memory_relations`
+  field, `SemanticsRegistry.memory_relation_ids()`,
+  `SemanticsRegistry.memory_record_predicate_ids()` (declared relations plus
+  the digest predicate — the validation set for memory-record writes), and
+  the `MEMORY_DIGEST_PREDICATE` constant (`"dcterms:abstract"`).
+- **`normalize_kg_predicate()` and `KG_PREDICATE_ALIAS_MAP_V0`.** Call
+  `normalize_kg_predicate()` at your ingestion boundary to map an
+  extractor-emitted predicate to its canonical registry id. Canonical ids
+  pass through, known aliases map to canonical, and anything else returns
+  `None` so you can refuse or label it — nothing is coerced to a guessed
+  meaning. Both are exported at package top level.
+- **`prov` prefix** (PROV-O), used by `equivalent` metadata.
+- **`py.typed` marker.** The package is fully annotated and its types are now
+  visible to type checkers in consumer projects.
 
-### Notes
+### Changed
 
-- `memory_relations` is deliberately disjoint from `predicates` (test-pinned):
-  the `predicates` list feeds the KG-extraction structured-output enum, and
-  memory plain words must never surface there.
-- Widening rule (both directions, on record with the memory seat): no new
-  relation engraves in AbstractMemory before it is declared here; nothing is
-  added here without coordinating with the memory seat. Ids are never renamed
-  or removed (append-only journals engrave them permanently).
-- Direction convention revised (2026-07-12): each entry's description defines
-  the authoritative direction; subject-is-the-new-record stays structural for
-  formation writers, while disposal-confirmed edges carry caller-asserted
-  endpoints (per-relation enforcement is memory's lane, flagged on the hub).
-- Equivalence policy recorded: one MOST-SPECIFIC term per entry (`refines`
-  lists `prov:wasRevisionOf` alone — a PROV-aware importer infers the broader
-  `prov:wasDerivedFrom`; double-emitting adds nothing). The known overlap
-  between `equivalent` CURIEs and KG predicate ids (`schema:mentions`,
-  `schema:previousItem`, `cito:supports`, `dcterms:isPartOf`) is declared and
-  test-pinned so a new instance is a decision, not drift.
-- Release-lineage note: no released artifact ever served registry version 1
-  (0.0.4 served version 0); the released jump is 0 → 2 in one package
-  version. Version 1 is kept distinct in the records because durable
-  decision-store and backlog entries cite "version 1 = seven relations".
+- Registry `version` is now `2`.
+- `KG_PREDICATE_ALIASES_V0` is derived from `KG_PREDICATE_ALIAS_MAP_V0` and
+  now offers only aliases with a single determinate canonical target.
+  `schema:hasParent`, `schema:hasMember`, `schema:recognizedAs`, and
+  `schema:hasMemorySource` are no longer offered. This affects you only if
+  you build schemas with `include_predicate_aliases=True` and rely on those
+  four spellings being accepted; use a canonical predicate id instead.
+- `build_kg_assertion_schema_v0(include_predicate_aliases=True)` offers an
+  alias only when its canonical target exists in the registry you passed, so
+  custom registries are never offered a spelling the boundary would reject.
+- Loader errors name the registry file, including YAML syntax errors.
+- `build_kg_assertion_schema_v0()` raises `ValueError` for negative bounds
+  rather than treating them as unbounded.
+- `ABSTRACTSEMANTICS_REGISTRY_PATH` pointing at a directory raises a message
+  that says so.
+
+### Registry validation
+
+`predicates` and `entity_types` remain lenient — malformed items are skipped
+and the load succeeds — because they feed structured-output enums. Problems
+that used to pass silently now report:
+
+- Duplicate YAML mapping keys fail the load. A stray second `predicates:`
+  block previously replaced the whole vocabulary without a warning.
+- Malformed items emit one warning per section, naming the file and the
+  number skipped.
+- An unparseable `version` warns and reads as `0`. An absent or explicitly
+  null `version` stays quiet.
+- Duplicate ids in `predicates`/`entity_types` warn and keep the first
+  occurrence, so every consumer resolves the same winner.
+
+`memory_relations` is validated strictly, because a declared relation
+immediately joins `memory_record_predicate_ids()` and its consumer writes to
+append-only journals. The load fails when a relation id contains a CURIE
+prefix, collides with a KG predicate id, omits `subject_role` or
+`object_role`, or is declared twice.
+
+A valid registry loads with no warnings.
+
+### Compatibility
+
+- `memory_relations` is disjoint from `predicates`. The `predicates` list
+  feeds the KG-extraction structured-output enum; memory-record plain words
+  never appear there.
+- Relation ids are additive: they are never renamed or removed, because
+  append-only journals record them permanently.
+- Some `equivalent` CURIEs (`schema:mentions`, `schema:previousItem`,
+  `cito:supports`, `dcterms:isPartOf`) also exist as `predicates` ids. This
+  is intentional and safe: memory-record validation accepts only plain-word
+  ids, and `equivalent` is export metadata.
+- `equivalent` mappings are many-to-one and lossy — several plain words can
+  share one broader CURIE — so they must not be used to import back to plain
+  words.
+- Registry version `1` was never published. Version `0.0.4` served registry
+  version `0`, so upgrading from `0.0.4` moves the registry from `0` to `2`.
 
 ## [0.0.4] - 2026-05-08
 

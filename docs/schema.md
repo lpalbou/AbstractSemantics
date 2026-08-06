@@ -75,8 +75,8 @@ for assertion in assertions:
 aliases via `KG_PREDICATE_ALIAS_MAP_V0`, and returns `None` for everything
 else. Matching is whitespace-stripped then exact (case-sensitive — CURIEs
 are case-sensitive; folding would guess). Only aliases with a determinate
-canonical mapping are offered in the enum, so every offered spelling is
-guaranteed normalizable (test-pinned round trip).
+canonical mapping are offered in the enum, so every spelling the schema
+offers is guaranteed to normalize.
 
 ## Schema shape (high level)
 

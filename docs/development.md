@@ -37,12 +37,18 @@ python scripts/generate_llms_full.py
 
 ## Release checklist (docs-first)
 
-- Update `pyproject.toml` version (and `CHANGELOG.md`)
+- Update `pyproject.toml` version and add the matching `CHANGELOG.md` section
 - Update `src/abstractsemantics/semantics.yaml` (registry changes)
 - Ensure docs reflect behavior (`docs/`)
 - Run `pytest`
 - Build with `python -m build`
 - Regenerate `llms-full.txt` (`python scripts/generate_llms_full.py`)
+- Tag `v<version>` to trigger `.github/workflows/release.yml`
+
+The release workflow refuses to publish unless the tag, the `pyproject.toml`
+version, and a dated `## [<version>] - <date>` changelog heading all agree, and
+it takes the release notes from that changelog section. Fold pending entries
+into the version's own section before tagging, or they ship undocumented.
 
 ## Related docs
 
@@ -51,4 +57,6 @@ python scripts/generate_llms_full.py
 - [Architecture](architecture.md)
 - [Registry format](registry.md)
 - [KG assertion JSON Schema](schema.md)
+- [API reference](api.md)
 - [FAQ](faq.md)
+- [Troubleshooting](troubleshooting.md)
