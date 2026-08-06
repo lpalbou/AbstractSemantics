@@ -30,7 +30,28 @@ List the allowed ids:
 ```python
 print(sorted(reg.predicate_ids())[:10])
 print(sorted(reg.entity_type_ids())[:10])
+print(sorted(reg.memory_relation_ids()))
 ```
+
+## Read the memory-relation vocabulary
+
+`memory_relations` is the plain-word edge vocabulary for memory records. Each entry names the role of both endpoints, so a writer can validate direction without restating the semantics:
+
+```python
+for rel in reg.memory_relations:
+    print(rel.id, ":", rel.subject_role, "->", rel.object_role)
+```
+
+Use `memory_record_predicate_ids()` as the validation set for memory-record writes. It is the declared relations plus the digest predicate:
+
+```python
+from abstractsemantics import MEMORY_DIGEST_PREDICATE
+
+allowed = reg.memory_record_predicate_ids()
+assert MEMORY_DIGEST_PREDICATE in allowed
+```
+
+See [Registry format](registry.md) for the rules this section is validated against.
 
 ## Build the v0 “KG assertion” JSON Schema
 
@@ -96,12 +117,27 @@ reg = load_semantics_registry(Path("/absolute/path/to/semantics.yaml"))
 
 If you pass an explicit `path`, the environment variable is ignored (`load_semantics_registry()` uses `path or resolve_semantics_registry_path()`).
 
-The loader is tolerant (skips invalid items) but requires at least one valid predicate id; see [Registry format](registry.md).
+A custom registry is held to the same rules as the shipped one: malformed `predicates`/`entity_types` items are skipped with a warning and at least one valid predicate id is required, while `memory_relations` problems fail the load. See [Registry format](registry.md) for the full list, and [Troubleshooting](troubleshooting.md) if a load fails.
+
+## Normalize predicates at your boundary
+
+If you enable predicate aliases in the schema, normalize what comes back before you persist it, so one predicate has one spelling at rest:
+
+```python
+from abstractsemantics import normalize_kg_predicate
+
+normalize_kg_predicate("schema:hasPart", registry=reg)  # 'dcterms:hasPart'
+normalize_kg_predicate("dcterms:hasPart", registry=reg)  # 'dcterms:hasPart'
+normalize_kg_predicate("something:invented", registry=reg)  # None
+```
+
+A `None` result means the predicate is not recognized. Refuse it or label it as unknown; it is never mapped to a guessed meaning. Pass `registry=reg` in a loop — omitting it reloads the YAML from disk on every call.
 
 ## Next
 
 - [Architecture](architecture.md)
 - [Registry format](registry.md)
 - [KG assertion JSON Schema](schema.md)
-- [FAQ](faq.md)
 - [API reference](api.md)
+- [FAQ](faq.md)
+- [Troubleshooting](troubleshooting.md)

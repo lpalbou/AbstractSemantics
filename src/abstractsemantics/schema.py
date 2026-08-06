@@ -12,25 +12,84 @@ from .registry import SemanticsRegistry, load_semantics_registry
 KG_ASSERTION_SCHEMA_REF_V0 = "abstractsemantics:kg_assertion_schema_v0"
 
 
-# Small, deterministic alias set for predicates that LLMs tend to emit by default.
+# Alias -> canonical normalization map for predicates that LLMs tend to emit
+# by default (backlog 0002, built 2026-07-13).
 #
-# These are *not* part of the canonical semantics registry. Prefer keeping
-# structured-output enums canonical (so the model is forced to pick from the
-# agreed semantics). Alias handling belongs at the ingestion boundary.
+# These aliases are *not* part of the canonical semantics registry. Prefer
+# keeping structured-output enums canonical (so the model is forced to pick
+# from the agreed semantics). When aliases ARE offered
+# (`include_predicate_aliases=True`), the ingestion boundary normalizes them
+# via `normalize_kg_predicate()` before anything persists — one spelling per
+# predicate at rest (the same rule the memory-relations vocabulary enforces).
 #
-# Keep this list intentionally small to protect model context + reduce confusion.
-KG_PREDICATE_ALIASES_V0: Sequence[str] = (
-    "schema:description",
-    "schema:creator",
-    "schema:hasParent",
-    "schema:hasMember",
-    "schema:recognizedAs",
-    "schema:hasMemorySource",
-    "schema:hasPart",
-    "schema:isPartOf",
-    "dcterms:has_part",
-    "dcterms:is_part_of",
-)
+# Design rules (the accept-vs-offer split, decision:workitem-type-enum):
+# - The OFFER set (`KG_PREDICATE_ALIASES_V0`, derived from this map's keys)
+#   contains ONLY aliases with a DETERMINATE canonical mapping. Earlier alias
+#   spellings without one (schema:hasParent — broader vs isPartOf is
+#   context-dependent; schema:hasMember — no member predicate in the
+#   registry; schema:recognizedAs — lossy vs sameAs; schema:hasMemorySource —
+#   invented term with unclear intent) were REMOVED from the offer: offering
+#   a spelling the boundary cannot normalize invites un-normalizable data.
+# - The ACCEPT side (`normalize_kg_predicate`) passes canonical ids through,
+#   maps known aliases, and returns None for everything else — the caller
+#   labels or refuses; nothing is ever silently coerced to a guessed meaning.
+# - The map's RANGE is canonical registry predicate ids only, and its keys
+#   are never themselves registry ids (both test-pinned).
+#
+# Keep this map intentionally small to protect model context + reduce confusion.
+KG_PREDICATE_ALIAS_MAP_V0: Dict[str, str] = {
+    # schema.org twins of declared dcterms ids (same meaning, one spelling at rest)
+    "schema:description": "dcterms:description",
+    "schema:creator": "dcterms:creator",
+    "schema:hasPart": "dcterms:hasPart",
+    "schema:isPartOf": "dcterms:isPartOf",
+    # snake_case spelling variants that do not exist in dcterms
+    "dcterms:has_part": "dcterms:hasPart",
+    "dcterms:is_part_of": "dcterms:isPartOf",
+}
+
+# The alias OFFER set, derived from the map's keys (never maintained by hand —
+# a second copy would drift; the map is the single source).
+KG_PREDICATE_ALIASES_V0: Sequence[str] = tuple(KG_PREDICATE_ALIAS_MAP_V0)
+
+
+def normalize_kg_predicate(
+    predicate: object,
+    registry: Optional[SemanticsRegistry] = None,
+) -> Optional[str]:
+    """Normalize a predicate string to its canonical registry id.
+
+    The ingestion-boundary half of the alias design: call this on every
+    extractor-emitted predicate before persisting. The parameter is typed
+    `object` deliberately — sanitizing raw LLM output IS the contract, so
+    non-string input returns None instead of raising.
+
+    Matching contract: input is whitespace-stripped, then matched EXACTLY
+    (case-sensitive — CURIEs are case-sensitive and case-folding would be
+    guessing). The returned id is the stripped form.
+
+    Perf note: `registry=None` loads the registry YAML from disk on EVERY
+    call — in a per-assertion loop, load once and pass it in.
+
+    Returns:
+    - the (stripped) id when it already is a canonical registry predicate id;
+    - the canonical id when the input is a known alias
+      (`KG_PREDICATE_ALIAS_MAP_V0`);
+    - None otherwise — the caller decides (refuse loudly or label unknown);
+      unknown strings are never coerced to a guessed canonical id.
+    """
+    if not isinstance(predicate, str):
+        return None
+    p = predicate.strip()
+    if not p:
+        return None
+    reg = registry or load_semantics_registry()
+    if p in reg.predicate_ids():
+        return p
+    canonical = KG_PREDICATE_ALIAS_MAP_V0.get(p)
+    if canonical is not None and canonical in reg.predicate_ids():
+        return canonical
+    return None
 
 
 def _dedup_preserve_order(values: Sequence[str]) -> list[str]:
@@ -59,15 +118,33 @@ def build_kg_assertion_schema_v0(
     """Build the structured-output JSON Schema used by the KG extractor workflows.
 
     This schema is deliberately small and meant to be stable:
-    - `predicate` is restricted to the semantics registry (+ optional aliases).
+    - `predicate` is restricted to the semantics registry (+ optional aliases;
+      only aliases whose canonical target exists in the registry are offered).
     - `subject_type` / `object_type` are restricted to the registry entity types.
     - Evidence fields are bounded (short verbatim snippets).
+
+    Bounds: `max_assertions=0` means unbounded (no `maxItems`); negative
+    bounds are rejected — a negative cap silently becoming "no cap" is the
+    dangerous coercion direction.
     """
     reg = registry or load_semantics_registry()
 
+    if int(max_assertions) < 0 or int(min_assertions_when_nonempty) < 0:
+        raise ValueError("max_assertions and min_assertions_when_nonempty must be >= 0")
+    if int(max_evidence_quote_len) < 0 or int(max_original_context_len) < 0:
+        raise ValueError("evidence length bounds must be >= 0")
+
     predicate_ids: List[str] = [p.id for p in reg.predicates if isinstance(p.id, str) and p.id.strip()]
     if include_predicate_aliases:
-        predicate_ids = list(predicate_ids) + list(KG_PREDICATE_ALIASES_V0)
+        # Offer ONLY aliases whose canonical target exists in THIS registry —
+        # offering a spelling the boundary cannot normalize invites
+        # un-normalizable data (custom/env-override registries may lack some
+        # canonical targets; the accept-side guard in normalize_kg_predicate
+        # has the same check).
+        have = set(predicate_ids)
+        predicate_ids = list(predicate_ids) + [
+            alias for alias, canonical in KG_PREDICATE_ALIAS_MAP_V0.items() if canonical in have
+        ]
     predicate_ids = _dedup_preserve_order(predicate_ids)
 
     entity_type_ids: List[str] = [t.id for t in reg.entity_types if isinstance(t.id, str) and t.id.strip()]

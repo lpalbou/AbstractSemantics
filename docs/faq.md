@@ -80,11 +80,19 @@ See [KG assertion JSON Schema](schema.md).
 
 ## What are “predicate aliases” and should I enable them?
 
-`src/abstractsemantics/schema.py` defines a small alias list (`KG_PREDICATE_ALIASES_V0`) for predicate strings that LLMs often emit by default.
+`src/abstractsemantics/schema.py` defines a small alias→canonical map
+(`KG_PREDICATE_ALIAS_MAP_V0`) for predicate spellings that LLMs often emit by
+default; the offered alias list (`KG_PREDICATE_ALIASES_V0`) is derived from
+its keys.
 
 - aliases are **not** part of the canonical registry YAML
-- enabling aliases (`include_predicate_aliases=True`) makes the schema accept those additional strings
-- downstream ingestion/normalization is still the right place to map aliases to canonical ids
+- enabling aliases (`include_predicate_aliases=True`) makes the schema accept those additional spellings
+- if you enable aliases, you **must** normalize at your ingestion boundary
+  with `normalize_kg_predicate()` before persisting — one spelling per
+  predicate at rest; it passes canonical ids through, maps known aliases,
+  and returns `None` for anything else (refuse or label; never guess)
+- only aliases with a determinate canonical mapping are offered — ambiguous
+  or invented spellings are deliberately absent
 
 See [KG assertion JSON Schema](schema.md).
 

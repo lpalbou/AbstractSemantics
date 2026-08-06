@@ -1,4 +1,4 @@
-version: 0
+version: 2
 
 prefixes:
   dcterms: "http://purl.org/dc/terms/"
@@ -6,6 +6,7 @@ prefixes:
   skos: "http://www.w3.org/2004/02/skos/core#"
   cito: "http://purl.org/spar/cito/"
   rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  prov: "http://www.w3.org/ns/prov#"
   ex: "http://example.org/"
 
 # v0 policy: predicate allowlist for ingestion validation + UI dropdowns.
@@ -121,6 +122,124 @@ predicates:
   - id: "cito:confirms"
     label: "confirms"
 
+# Memory-record edge vocabulary (AbstractMemory typed records).
+#
+# Declared per decision:0016-vocabulary-direction (2026-07-10, agora commons
+# store; semantics c173 -> memory c184 -> resolved c190): the engine's
+# append-only journals engrave predicate strings permanently and equality-key
+# them with no alias resolution at read, so the PLAIN WORDS below are the
+# canonical at-rest spelling — one spelling per predicate, forever. CURIE
+# forms ride `equivalent:` as interop/export metadata ONLY, never a second
+# at-rest spelling.
+#
+# This section is deliberately SEPARATE from `predicates:` — that list feeds
+# the KG-extraction structured-output enum (build_kg_assertion_schema_v0),
+# and memory-record edges must never appear there (two spellings of one
+# predicate in front of an extractor is the confusion the ruling forbids).
+# The digest predicate for memory records is `dcterms:abstract` (declared in
+# `predicates:` above); AbstractMemory's validation set = these ids plus it.
+#
+# Direction convention (revised 2026-07-12 with the disposal writer path):
+# each entry's DESCRIPTION defines the authoritative semantic direction.
+# For FORMATION-time writers the rule subject = the authored/newer record is
+# structural (edges ride the newly formed record). Disposal-confirmed edges
+# (confirm_relation) carry CALLER-asserted endpoints — the caller must match
+# the description's direction; enforcement is memory's lane (flagged
+# 2026-07-12).
+#
+# `equivalent` lists are MANY-TO-ONE and LOSSY interop hints: several plain
+# words may share one broader CURIE (summarizes/from_session/derived_from
+# all specialize prov:wasDerivedFrom) — the mapping is never reversible and
+# must never drive an import back to plain words. Policy: one MOST-SPECIFIC
+# term per entry (refines lists prov:wasRevisionOf alone, never also its
+# superproperty prov:wasDerivedFrom — a PROV-aware importer infers it).
+#
+# KNOWN OVERLAP (declared, not drift): some `equivalent` CURIEs also appear
+# as ids in `predicates:` above (schema:mentions, schema:previousItem,
+# cito:supports, dcterms:isPartOf). Safe by construction — memory validation
+# accepts only the plain-word ids (a CURIE-spelled memory edge is refused),
+# and `equivalent` is export-only. A test pins this exact overlap set so a
+# new instance is a decision, not drift.
+#
+# Widening rule (both ways, e-s 143/145): no new relation engraves before a
+# declaration lands here, coordinated with the memory seat; nothing is added
+# here without coordinating with memory. Declaration IS permission: a
+# declared id immediately joins memory_record_predicate_ids(), so watched
+# not-yet-written words (e.g. `resolves`, reader-only today) stay OUT of
+# this section until their writer ships — the watch lives in backlog 0001.
+memory_relations:
+  - id: "summarizes"
+    label: "summarizes"
+    description: "A summary/reflection record names a source record it condenses (a summary must name its sources)."
+    equivalent: ["prov:wasDerivedFrom"]
+    subject_role: "summary"
+    object_role: "source"
+  - id: "mentions"
+    label: "mentions"
+    description: "Weak associative link from a record to one it references without deriving from it (e.g. dream records naming their source islands)."
+    equivalent: ["schema:mentions"]
+    subject_role: "referencing record"
+    object_role: "referenced record"
+  - id: "written_amid"
+    label: "written amid"
+    description: "Act-frame co-presence: a diary projection points at the graph records attended at write time. No exact standard-ontology equivalent (broadest near term: prov:wasInfluencedBy); deliberately unmapped."
+    subject_role: "diary projection"
+    object_role: "attended record"
+  - id: "from_session"
+    label: "from session"
+    description: "An elected identity record (e.g. an interest) points at the session record it grew out of."
+    equivalent: ["prov:wasDerivedFrom"]
+    subject_role: "elected record"
+    object_role: "session"
+  - id: "reflected_in"
+    label: "reflected in"
+    description: "An exchange/episode points at a diary entry elected during it (the exchange is the subject the entry reflects on). Only non-private projections carry this edge — private diary projections carry no edges by the containment rule."
+    equivalent: ["schema:subjectOf"]
+    subject_role: "exchange"
+    object_role: "diary entry"
+  - id: "continues"
+    label: "continues"
+    description: "An episode points at the immediately preceding episode in its session chain."
+    equivalent: ["schema:previousItem"]
+    subject_role: "episode"
+    object_role: "preceding episode"
+  - id: "derived_from"
+    label: "derived from"
+    description: "General derivation: a record points at the source material it was derived from."
+    equivalent: ["prov:wasDerivedFrom"]
+    subject_role: "derived record"
+    object_role: "source"
+  - id: "refines"
+    label: "refines"
+    description: "A newer revision points at the record it revises and supersedes (revision chains, e.g. world-model orientation cards)."
+    equivalent: ["prov:wasRevisionOf"]
+    subject_role: "new revision"
+    object_role: "prior revision"
+  - id: "answers"
+    label: "answers"
+    description: "A record answers a question record (subject = the answering record, object = the question). Distinct from the attributes.answers REFERENCE on diary entries (a book entry / record id, not an edge)."
+    equivalent: ["cito:repliesTo"]
+    subject_role: "answer"
+    object_role: "question"
+  - id: "supports"
+    label: "supports"
+    description: "A record provides evidential support for another (subject = the supporting evidence, object = the claim/lesson/record supported — cito:supports direction; the inverse reading is a distinct word, never this one)."
+    equivalent: ["cito:supports"]
+    subject_role: "evidence"
+    object_role: "claim"
+  - id: "part_of"
+    label: "part of"
+    description: "A record is a component of a larger record or story (subject = the part, object = the whole)."
+    equivalent: ["dcterms:isPartOf"]
+    subject_role: "part"
+    object_role: "whole"
+
+# NAMING NOTE (disambiguation): "entity_types" here = NER-sense classes for
+# KG extraction (what kind of thing a knowledge-graph node is: person, place,
+# concept...). This is UNRELATED to the framework's SUMMONED ENTITIES
+# (named persistent identities with homes/phases) — that vocabulary lives in
+# the gateway/runtime lanes; the maintainer's preferred term there is
+# "summoned entity" precisely because "named entity" collides with NER here.
 entity_types:
   # Generic "real-world thing" catch-all (includes physical objects).
   - id: "schema:Thing"

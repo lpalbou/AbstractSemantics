@@ -17,6 +17,7 @@ If `ABSTRACTSEMANTICS_REGISTRY_PATH` is set and points to a non-existent file, `
 - `prefixes`: mapping `prefix -> namespace_iri` (strings only)
 - `predicates`: list of predicate definitions (must contain at least 1 valid entry)
 - `entity_types`: list of entity-type definitions (may be empty, but some workflows require it)
+- `memory_relations`: list of memory-record edge relations (plain-word ids; see below)
 
 Unknown keys are ignored.
 
@@ -43,6 +44,13 @@ Invalid items are skipped. If no valid predicates remain, `load_semantics_regist
 
 ## Entity-type definitions
 
+Naming note: `entity_types` are NER-sense classes for KG extraction (what
+kind of thing a knowledge-graph node is). They are unrelated to the
+framework's *summoned entities* (named persistent identities with homes and
+phases) — that vocabulary lives in the gateway/runtime lanes, and the
+preferred term there is "summoned entity" precisely because "named entity"
+collides with NER here.
+
 Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance with:
 
 - `id` (required): string, typically a CURIE like `schema:Person`
@@ -51,6 +59,77 @@ Each item under `entity_types` becomes an `EntityTypeDef` dataclass instance wit
 - `description` (optional): string
 
 Invalid items are skipped. The registry loader does not currently require entity types to be present; however, `build_kg_assertion_schema_v0()` raises `ValueError` if the provided registry has no entity types.
+
+## Memory-relation definitions
+
+Each item under `memory_relations` becomes a `MemoryRelationDef` dataclass instance with:
+
+- `id` (required): a **plain word** (e.g. `summarizes`, `written_amid`) — deliberately NOT a CURIE
+- `label` (optional): string
+- `description` (optional): string
+- `equivalent` (optional): list of standard-ontology CURIEs (equal-or-broader terms) carried as export/interop metadata only
+
+- `subject_role` (required): short noun naming the subject endpoint (e.g. `evidence`)
+- `object_role` (required): short noun naming the object endpoint (e.g. `claim`)
+
+This vocabulary is the declared edge-relation set for AbstractMemory's typed
+memory records. The rules below govern it:
+
+- **Plain words are the canonical spelling at rest.** Memory journals are
+  append-only and match predicate strings exactly, with no alias resolution
+  at read time, so a recorded word can never be renamed. `equivalent` CURIEs
+  are hints for export and interop — never a second spelling at rest.
+- **Equivalents are many-to-one and lossy.** Several plain words may share
+  one broader CURIE (`summarizes`, `from_session`, and `derived_from` all
+  specialize `prov:wasDerivedFrom`). The mapping is not reversible and must
+  not be used to import back to plain words.
+- **One most-specific equivalent per entry.** `refines` lists
+  `prov:wasRevisionOf` alone and not its superproperty `prov:wasDerivedFrom`,
+  which a PROV-aware importer infers.
+- **Disjoint from `predicates`.** The `predicates` list feeds the
+  KG-extraction structured-output enum, and memory relations must never
+  appear there. Some `equivalent` CURIEs (`schema:mentions`,
+  `schema:previousItem`, `cito:supports`, `dcterms:isPartOf`) do also exist
+  as `predicates` ids — that is intentional and safe, because validation
+  accepts only plain-word ids and `equivalent` is export-only.
+- **Additive only.** Ids are never renamed or removed, because journals
+  record them permanently. Declaring a relation grants permission to write
+  it: a declared id immediately joins the validation set, so a word is
+  declared when its writer ships, not in anticipation.
+- **Each description defines the authoritative direction**, and
+  `subject_role`/`object_role` carry it in machine-readable form. For
+  formation-time writers, the subject is the newly formed record. Writers
+  that accept caller-asserted endpoints validate them against the declared
+  roles.
+- **The validation set** is `SemanticsRegistry.memory_record_predicate_ids()`:
+  the declared relation ids plus the digest predicate
+  (`MEMORY_DIGEST_PREDICATE = "dcterms:abstract"`). Memory-record writes are
+  checked against it.
+
+### Validation
+
+Unlike `predicates` and `entity_types`, this section is validated strictly:
+a malformed entry raises instead of being skipped, because a declared
+relation is written into append-only storage where a typo cannot be undone.
+The load fails when a relation:
+
+- has an id containing a `:` (ids must be plain words);
+- has an id that is also a `predicates` id;
+- omits `subject_role` or `object_role`;
+- is declared more than once.
+
+These rules apply to every registry, including one supplied through
+`ABSTRACTSEMANTICS_REGISTRY_PATH`. See [Troubleshooting](troubleshooting.md)
+for the exact messages.
+
+### Scope boundary
+
+This registry owns the at-rest **predicate** vocabulary. It deliberately does
+not declare closed sets that belong to the packages that write them —
+AbstractMemory's record-kind and `diary_type` sets, or the entity phase keys
+and mode enums owned by the gateway and runtime. Import those from their
+owning package rather than copying them here, so there is only ever one
+authority for each set.
 
 ## Minimal example
 

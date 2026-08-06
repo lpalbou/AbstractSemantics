@@ -6,6 +6,7 @@ This package intentionally contains **definitions**, not storage:
 - prefix mappings (CURIE namespaces)
 - predicate allowlists (optional inverse pointers)
 - entity-type allowlists
+- memory-relation declarations (plain-word edge vocabulary with direction roles)
 
 ## AbstractFramework ecosystem
 
@@ -15,7 +16,7 @@ This package intentionally contains **definitions**, not storage:
 - **AbstractCore** (core primitives/contracts): https://github.com/lpalbou/abstractcore
 - **AbstractRuntime** (execution + ingestion boundary): https://github.com/lpalbou/abstractruntime
 
-In practice, this repo provides the shared **allowed ids** (predicates and entity types) and a small JSON Schema helper that downstream components (including runtimes) can use for validation and structured outputs.
+In practice, this repo provides the shared **allowed ids** (predicates, entity types, and memory relations) and a small JSON Schema helper that downstream components (including runtimes) can use for validation and structured outputs.
 
 ## Status
 
@@ -23,6 +24,7 @@ Small, dependency-light package (only PyYAML) with a tiny public API:
 - the default registry is shipped as package data (`abstractsemantics/semantics.yaml`; in this repo: `src/abstractsemantics/semantics.yaml`)
 - the loader returns immutable dataclasses (`SemanticsRegistry`)
 - the v0 schema builder produces a deterministic JSON Schema dict
+- `normalize_kg_predicate()` maps extractor-emitted predicates to canonical ids at your ingestion boundary
 
 This package makes no network calls and does not store/query data (see `src/abstractsemantics/registry.py` and `src/abstractsemantics/schema.py`).
 
@@ -59,6 +61,28 @@ reg = load_semantics_registry()
 print(len(reg.predicates), len(reg.entity_types))
 
 schema = build_kg_assertion_schema_v0(registry=reg, include_predicate_aliases=True)
+```
+
+Read the memory-relation vocabulary and the validation set for memory-record writes:
+
+```python
+from abstractsemantics import load_semantics_registry
+
+reg = load_semantics_registry()
+print(sorted(reg.memory_relation_ids()))
+print(sorted(reg.memory_record_predicate_ids()))
+
+supports = next(r for r in reg.memory_relations if r.id == "supports")
+print(supports.subject_role, "->", supports.object_role)  # evidence -> claim
+```
+
+Normalize an extractor-emitted predicate before persisting it:
+
+```python
+from abstractsemantics import normalize_kg_predicate
+
+normalize_kg_predicate("schema:hasPart", registry=reg)  # 'dcterms:hasPart'
+normalize_kg_predicate("something:invented", registry=reg)  # None
 ```
 
 Resolve a stable `$ref` (useful when a downstream system stores schema references rather than full dicts):
@@ -110,14 +134,17 @@ Start with:
 - `docs/architecture.md` (what exists in this repo, with diagrams)
 - `docs/registry.md` (registry YAML format)
 - `docs/schema.md` (KG assertion JSON Schema + `$ref`)
-- `docs/faq.md` (common questions and troubleshooting)
+- `docs/api.md` (public API surface)
+- `docs/faq.md` (common questions)
+- `docs/troubleshooting.md` (symptoms, causes, and fixes)
 
 ## Project
 
 - Changelog: `CHANGELOG.md`
 - Contributing: `CONTRIBUTING.md`
+- Code of conduct: `CODE_OF_CONDUCT.md`
 - Security: `SECURITY.md`
-- Acknowledgments: `ACKNOWLEDMENTS.md`
+- Acknowledgments: `ACKNOWLEDGMENTS.md`
 
 ## License
 
