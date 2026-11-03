@@ -2,6 +2,14 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.0.6] - 2026-11-03
+
+### Changed
+
+- No change to the package's API, registry content or behavior. The repository no longer tracks local
+  agent-tool configuration, and the backlog records a proposed review of the Koine general-purpose
+  vocabulary (backlog 0004).
+
 ## [0.0.5] - 2026-08-06
 
 ### Added
